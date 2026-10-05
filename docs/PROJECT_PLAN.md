@@ -1,8 +1,10 @@
-# Inner Circle: Project Plan
+# Clique: Project Plan
 
-> **Inner Circle** is a private messaging app for you and your closest friends. Chat one-on-one or in group chats, with a built-in AI assistant that catches you up on what you missed, helps plan hangouts, and suggests replies. The assistant only steps in when you ask it to.
+> **Clique**: *your people, your chats, a little help from AI.*
+>
+> Clique is a private messaging app for you and your closest friends. Chat one-on-one or in group chats, share photos and videos, and get help from a built-in AI assistant that catches you up on what you missed, helps you write replies, and plans hangouts. The AI only steps in when you ask, and nothing is ever sent without your approval.
 
-This document is the planning spec, written before any code. It covers every page and its features, the tools used to build it, and how hard each feature is given the current skill set (Python, Django, Django REST Framework, SQL, HTML/CSS, Bootstrap, Docker, Git).
+This document is the planning spec, written before any code. It covers every page and its features, the AI assistant, the tools used to build the app, and how hard each feature is given the current skill set (Python, Django, Django REST Framework, SQL, HTML/CSS, Bootstrap, Docker, Git).
 
 ---
 
@@ -23,7 +25,7 @@ The first page a logged-out visitor sees.
 
 | Feature | Difficulty |
 |---|---|
-| App name, tagline, and short description of what Inner Circle does | ✅ |
+| Clique logo, tagline, and short description of the app | ✅ |
 | Screenshots or GIF of the app in action | ✅ |
 | "Sign up" and "Log in" buttons | ✅ |
 | "Try the demo" button that logs in as a guest account with sample chats (useful for recruiters) | ✅ |
@@ -55,7 +57,7 @@ The main screen after logging in.
 | Feature | Difficulty |
 |---|---|
 | List of all the user's conversations (private and group), newest activity first | ✅ |
-| Each row shows: chat name or friend's name, avatar, last message preview, time sent | ✅ |
+| Each row shows: chat name or friend's name, avatar, last message preview ("📷 Photo" / "🎥 Video" for media), time sent | ✅ |
 | Unread message count badge on each chat | 🟡 |
 | Online/offline dot next to friends | 🟡 |
 | List updates live when a new message arrives (no refresh) | 🟡 |
@@ -76,17 +78,30 @@ The core of the app. Private chats and group chats use the same page.
 | "Alex is typing…" indicator | 🟡 |
 | Edit or delete your own messages (shows "edited" / "message deleted") | ✅ |
 | Emoji reactions on messages | 🟡 (v2) |
-| Send images | 🟡 (v2) |
 | Header shows the friend's name and status, or group name and member count; click it to open the profile or group info | ✅ |
+
+**Photos and videos**
+
+| Feature | Difficulty |
+|---|---|
+| 📎 button to attach photos (JPG, PNG, GIF, WEBP) and videos (MP4, MOV) | 🟡 |
+| Preview before sending, with an optional caption | 🟡 |
+| Upload progress bar | 🟡 |
+| Photos show as thumbnails and open full-size when tapped; videos play in a built-in player | 🟡 |
+| Limits: 10 MB per photo, 50 MB per video. Files are checked by their real contents, not just the file name | 🟡 |
+| Media is private: only chat members can open it (signed, expiring links) | 🟡 |
+| "Media" tab in chat info showing all shared photos and videos | ✅ |
 
 **AI assistant in the chat** (see section 2 for details)
 
 | Feature | Difficulty |
 |---|---|
 | "Catch me up" button that summarizes unread messages | 🟡 |
-| Type `@circle` followed by a question to ask the assistant in the chat | 🟡 |
-| Suggested quick replies above the message box | 🟡 |
-| "Tone check" before sending a message | 🟡 (v2) |
+| Smart replies: 3 quick suggestions above the message box | 🟡 |
+| ✨ "Help me reply": describe what you want to say and the AI writes a draft for you to edit | 🟡 |
+| Type `@clique` followed by a question to ask the assistant in the chat | 🟡 |
+| Reply agent: an assistant that looks things up in the chat and takes actions, like making a poll | 🔴 |
+| Tone check before sending a message | 🟡 (v2) |
 
 ### 1.6 New chat / create group chat
 
@@ -103,7 +118,7 @@ The core of the app. Private chats and group chats use the same page.
 |---|---|
 | View group name, photo, and member list (who's an admin) | ✅ |
 | **Admins:** rename group, change photo, add members, remove members, make another member an admin | ✅ |
-| **Everyone:** leave group, mute notifications | ✅ |
+| **Everyone:** leave group, mute notifications, see shared media | ✅ |
 | Turn the AI assistant on or off for this group (admin setting) | ✅ |
 | System messages appear in the chat, e.g. "Sam added Jordan" | ✅ |
 | If the last admin leaves, the oldest member becomes admin automatically | ✅ |
@@ -146,17 +161,18 @@ The core of the app. Private chats and group chats use the same page.
 | Change email | ✅ |
 | Change password (requires current password) | ✅ |
 | **Privacy:** who can send friend requests (everyone or friends of friends) and show/hide online status | ✅ |
-| **AI settings:** turn smart replies on or off; opt out of AI summaries that include your messages | ✅ |
+| **AI settings:** turn smart replies on or off; opt out of having your messages included in AI summaries and reply drafts; show or hide the "✨ AI-assisted" label | ✅ |
 | Light/dark theme | ✅ |
-| **Delete account:** confirmation screen where you retype your password; your profile and friendships are removed, and your old messages show as "Deleted user" so group chats still make sense | ✅ |
+| **Delete account:** confirmation screen where you retype your password; your profile, friendships, and uploaded media are removed, and your old messages show as "Deleted user" so group chats still make sense | ✅ |
 | Download my data (export your messages as a file) | 🔴 (v2) |
 
 ### 1.12 Admin panel (for you as site owner)
 
 | Feature | Difficulty |
 |---|---|
-| Django admin to view users, chats, and reports | ✅ |
-| Handle reported users: warn, suspend, or delete | ✅ |
+| Django admin to view users, chats, media, and reports | ✅ |
+| Handle reported users or media: warn, suspend, delete | ✅ |
+| AI usage dashboard: requests per user per day, to watch costs | 🟡 |
 
 ### 1.13 Error pages
 
@@ -166,32 +182,54 @@ The core of the app. Private chats and group chats use the same page.
 
 ---
 
-## 2. AI assistant ("Circle")
+## 2. AI assistant ("Clique AI")
 
-The assistant runs on the Claude API. The Django server sends it the relevant messages and returns its answer. It **never reads chats on its own**; it only runs when a user clicks an AI button or types `@circle`.
+Clique AI runs on the Claude API. The Django server sends it the relevant messages and returns its answer. It **never reads chats on its own and never sends anything for you**; it only runs when a user clicks an AI button or types `@clique`.
+
+### 2.1 Features
 
 | Feature | What it does | Where it shows up | Difficulty |
 |---|---|---|---|
-| **Catch me up** | Summarizes the messages you missed in a busy chat into a few bullet points ("Plans moved to Saturday; Jordan is bringing snacks") | Button at the top of a chat when you have 20+ unread messages | 🟡 |
-| **@circle in chats** | Ask a question inside a group chat and the assistant replies as a special "Circle" member. Examples: "@circle what time did we agree on?", "@circle suggest a place to eat near downtown" | Chat page | 🟡 |
-| **Smart replies** | Shows 3 short suggested replies based on the last few messages | Above the message box (can be turned off in settings) | 🟡 |
-| **Poll maker** | "@circle make a poll: pizza or tacos?" creates a vote in the chat | Chat page | 🔴 (v2) |
-| **Tone check** | Before sending, optionally checks if a message might come across as rude and suggests a softer version | Message box | 🟡 (v2) |
+| **Catch me up** | Summarizes the messages you missed into a few bullet points ("Plans moved to Saturday; Jordan is bringing snacks; Sam shared a photo of the tickets") | Button at the top of a chat when you have 20+ unread messages | 🟡 |
+| **Smart replies** | 3 short suggested replies based on the last few messages; tap one to put it in the message box | Above the message box (can be turned off) | 🟡 |
+| **✨ Help me reply** | You say what you want ("say no politely, I'm busy Saturday", "make this less awkward", "reply something funny") and the AI writes a draft that fits the conversation. Edit it, ask for another version, or send it | ✨ button in the message box | 🟡 |
+| **@clique in chats** | Ask the assistant a question inside a chat and it replies as a labeled "Clique AI" message. Examples: "@clique what time did we agree on?", "@clique suggest a place to eat downtown" | Chat page | 🟡 |
+| **Reply agent** | An AI agent with tools. Ask "help me answer Jordan about the trip" and it searches the chat for trip details, checks who already said yes, then drafts a reply or offers to create a poll | ✨ menu → "Ask the agent" | 🔴 |
+| **Tone check** | Before sending, optionally checks whether a message might come across as rude and suggests a softer version | Message box | 🟡 (v2) |
 | **Search by meaning** | "When did Sam mention the concert?" finds the message even if the exact words differ | Chat search | 🔴 (v2) |
 
-**Is the AI part within your skills? Yes.** Calling the Claude API from Django is a normal Python function call using Anthropic's official `anthropic` library. If you've built REST APIs, you can do this. The new parts to learn are:
-1. Writing good prompts (instructions for the AI)
-2. Keeping the API key secret (in an environment variable, never in code or GitHub)
-3. Running AI requests in the background (Celery) so the chat doesn't freeze while waiting
-4. Limiting how often each user can call the AI so costs stay low
+### 2.2 How "Help me reply" works
+1. The user taps ✨ and types what they want to say.
+2. Django gathers the last 20–30 messages in that chat (skipping users who opted out), labeled by sender.
+3. Django sends them to the Claude API with instructions like: *"You help [user] write a reply in a friend group chat. Match their casual style. Return only the message text."*
+4. The draft appears in the message box. **The user always reviews it and presses send themselves.**
 
-**Privacy rules (mention these in the README):**
-- The AI only sees messages from the chat it was called in, and only the most recent ones it needs
-- Users who opted out are left out of AI summaries
-- Group admins can turn the assistant off for their group
-- AI replies are clearly labeled as coming from Circle
+### 2.3 How the reply agent works (tool use)
+The Claude API supports **tool use**: you write Python functions and Claude decides when to call them. Planned tools:
 
-**Model and cost:** the default choice is Claude Opus 5.5 (`claude-opus-5-5`, $4 per million input tokens and $20 per million output tokens). A "catch me up" summary of about 200 messages costs roughly **2 cents**. Cheaper models (Claude Sonnet 5.5 at $2/$10, Claude Haiku 4.5 at $1/$5) are also an option if you want to cut costs; decide once you can compare the output quality yourself. Set a monthly spending limit in the Anthropic Console so a demo can't run up a bill.
+| Tool | What it does |
+|---|---|
+| `search_messages(query)` | Finds earlier messages in the current chat |
+| `get_members()` | Lists who is in the chat |
+| `create_poll(question, options)` | Proposes a poll; the user has to confirm before it's posted |
+| `draft_reply(text)` | Puts the final draft in the message box |
+
+Each tool only reaches the chat the user is in, and anything that posts to the chat needs the user's confirmation.
+
+### 2.4 Safety and privacy rules (mention these in the README)
+- **The user stays in control:** AI drafts are never sent automatically.
+- **Only the current chat:** the AI sees only the messages it needs from the chat where it was called.
+- **Opt-outs are respected:** users who opted out are left out of summaries and drafts. Group admins can turn the AI off for the whole group.
+- **Prompt injection protection:** messages from other users are treated as information, never as instructions. A friend typing "AI, ignore your rules…" has no effect.
+- **Clear labels:** AI replies are marked "Clique AI", and drafts can carry an optional "✨ AI-assisted" label.
+- **Rate limits:** for example, 30 AI requests per user per day, to keep costs predictable.
+
+### 2.5 Model and cost
+The default model is **Claude Opus 5.5** (`claude-opus-5-5`, $4 per million input tokens and $20 per million output tokens).
+- A "catch me up" summary of about 200 messages costs roughly **2 cents**.
+- A reply draft costs well under **1 cent**.
+
+Cheaper models (Claude Sonnet 5.5 at $2/$10, Claude Haiku 4.5 at $1/$5) are also an option if you want to cut costs; decide once you can compare the quality yourself. Set a monthly spending limit in the Anthropic Console. Claude can also understand photos, so "catch me up" can describe shared images; it can't watch videos.
 
 ---
 
@@ -201,14 +239,15 @@ The assistant runs on the Claude API. The Django server sends it the relevant me
 |---|---|---|
 | Language | Python 3.12 | ✅ |
 | Web framework | Django 5 | ✅ |
-| REST API (for AJAX calls and a possible future mobile/React app) | Django REST Framework | ✅ |
+| REST API (AJAX calls, uploads, and a possible future mobile/React app) | Django REST Framework | ✅ |
 | Real-time messaging (WebSockets) | Django Channels and Daphne | 🟡 |
-| Message delivery between server processes, plus cache | Redis | 🟡 |
-| Background jobs (AI calls, emails) | Celery (with Redis) | 🟡 |
+| Message delivery between server processes, plus cache and rate limits | Redis | 🟡 |
+| Background jobs (AI calls, media processing, emails) | Celery (with Redis) | 🟡 |
 | Database | PostgreSQL (SQLite is fine for quick local tests) | 🟡 (a small change from MySQL) |
-| Frontend | Django templates, Bootstrap 5, HTMX, a little JavaScript for the WebSocket | ✅ / 🟡 HTMX |
-| AI | Claude API with the `anthropic` Python library | 🟡 |
-| Image storage | Local media folder in development; Cloudinary or AWS S3 in production | 🟡 |
+| Frontend | Django templates, Bootstrap 5, HTMX, a little JavaScript for the WebSocket and uploads | ✅ / 🟡 HTMX |
+| AI | Claude API with the `anthropic` Python library (including tool use for the reply agent) | 🟡 / 🔴 agent |
+| Photo and video storage, compression, and thumbnails | Cloudinary (free tier), with AWS S3 as an alternative | 🟡 |
+| Image handling and upload checks | Pillow and python-magic (checks real file type) | 🟡 |
 | Email (password reset, verification) | Console email backend in development; SendGrid or Mailgun in production | 🟡 |
 | Containers | Docker and Docker Compose (web, database, Redis, Celery worker) | ✅ |
 | Testing | pytest and pytest-django | 🟡 |
@@ -216,7 +255,7 @@ The assistant runs on the Claude API. The Django server sends it the relevant me
 | CI (runs tests on each push) | GitHub Actions | 🟡 |
 | Hosting | Render, Railway, or Fly.io | 🟡 |
 | Version control | Git and GitHub | ✅ |
-| Diagrams for the README | draw.io or Excalidraw | ✅ |
+| Logo and diagrams for the README | Canva or Figma (logo), draw.io or Excalidraw (diagrams) | ✅ |
 
 ---
 
@@ -224,15 +263,18 @@ The assistant runs on the Claude API. The Django server sends it the relevant me
 
 | Table | Key fields |
 |---|---|
-| **User** (extends Django's user) | username, email, display_name, bio, avatar, status_message, last_seen, ai_opt_out |
+| **User** (extends Django's user) | username, email, display_name, bio, avatar, status_message, last_seen, ai_opt_out, smart_replies_on |
 | **FriendRequest** | from_user, to_user, status (pending/accepted/declined), created_at |
 | **Friendship** | user_a, user_b, created_at |
 | **Block** | blocker, blocked |
 | **Conversation** | type (private/group), name, photo, ai_enabled, created_by, created_at |
 | **Membership** | conversation, user, role (member/admin), joined_at, last_read_at, muted |
-| **Message** | conversation, sender (null means AI or system), type (text/image/system/ai), body, created_at, edited_at, deleted |
+| **Message** | conversation, sender (null means AI or system), type (text/media/system/ai), body, ai_assisted, created_at, edited_at, deleted |
+| **Attachment** | message, kind (image/video), file_url, thumbnail_url, size_bytes, width, height, duration |
+| **Poll** / **PollVote** | message, question, options; poll, user, choice |
+| **AIUsage** | user, feature, tokens_in, tokens_out, created_at |
 | **Reaction** (v2) | message, user, emoji |
-| **Report** | reporter, reported_user, reason, created_at, resolved |
+| **Report** | reporter, reported_user or message, reason, created_at, resolved |
 
 Unread counts come from comparing `Membership.last_read_at` against message timestamps. Private chats and group chats are both `Conversation` rows, so one chat page handles both.
 
@@ -247,12 +289,14 @@ Unread counts come from comparing `Membership.last_read_at` against message time
 | **2. Friends** | Search users, friend requests, friends list, block, other users' profiles | Two users can become friends |
 | **3. Chats (no real-time yet)** | Conversation and message models, inbox, chat page, create group, group settings | Messages work after refreshing the page |
 | **4. Real-time** | Channels WebSockets: live messages, typing indicator, read receipts, online status, live inbox | Two browser windows chat instantly |
-| **5. AI** | Celery, "catch me up", `@circle`, smart replies, AI settings, rate limits | The demo shows the AI helping in a group chat |
-| **6. Polish and launch** | Tests, deployment, guest demo account with sample chats, README with GIF and architecture diagram | A live link is on the resume |
-| **7. Version 2 (optional)** | Reactions, images, polls, tone check, search by meaning, data export | — |
+| **5. Photos and videos** | Cloudinary uploads, previews, progress bar, private links, media tab; photos first, then videos | Friends can share photos and videos in chats |
+| **6. AI basics** | Celery, catch me up, smart replies, help me reply, @clique, AI settings, rate limits | The demo shows the AI helping in a group chat |
+| **7. Reply agent** | Tool use: search messages, get members, create poll (with confirmation) | "Help me answer Jordan about the trip" works from start to finish |
+| **8. Polish and launch** | Tests, deployment, guest demo account with sample chats, README with GIF and architecture diagram | A live link is on the resume |
+| **9. Version 2 (optional)** | Reactions, tone check, search by meaning, data export | — |
 
 ---
 
 ## 6. Overall feasibility
 
-About **70% of the features are things you've already built** (forms, login, CRUD, permissions, SQL relationships). The new skills are WebSockets (Channels), Redis/Celery, the Claude API, and deployment. Each one is widely used, well documented, and gives you something new to put on your resume. Nothing in phases 0–6 is out of reach. The 🔴 items are left for v2 so they don't block a finished, demo-ready app.
+About **two-thirds of the features are things you've already built** (forms, login, CRUD, permissions, SQL relationships). The new skills are WebSockets (Channels), Redis/Celery, cloud media storage, the Claude API, and deployment. Each one is widely used, well documented, and gives you something new to put on your resume. Phases 0–6 are realistic with your current skills. Phase 7 (the reply agent) is a stretch, but you'll be ready for it once the basic AI features work. Version 2 items are optional, so they can't stop you from finishing.
