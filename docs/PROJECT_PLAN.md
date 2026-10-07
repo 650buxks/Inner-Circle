@@ -242,18 +242,18 @@ Cheaper models (Claude Sonnet 5.5 at $2/$10, Claude Haiku 4.5 at $1/$5) are also
 | REST API (AJAX calls, uploads, and a possible future mobile/React app) | Django REST Framework | ✅ |
 | Real-time messaging (WebSockets) | Django Channels and Daphne | 🟡 |
 | Message delivery between server processes, plus cache and rate limits | Redis | 🟡 |
-| Background jobs (AI calls, media processing, emails) | Celery (with Redis) | 🟡 |
-| Database | PostgreSQL (SQLite is fine for quick local tests) | 🟡 (a small change from MySQL) |
+| Background jobs (AI calls, media processing, emails) | Celery (with Redis) locally; on the free host, tasks run inline (see section 7) | 🟡 |
+| Database | PostgreSQL: Docker locally, **Neon** free tier when deployed | 🟡 (a small change from MySQL) |
 | Frontend | Django templates, Bootstrap 5, HTMX, a little JavaScript for the WebSocket and uploads | ✅ / 🟡 HTMX |
 | AI | Claude API with the `anthropic` Python library (including tool use for the reply agent) | 🟡 / 🔴 agent |
 | Photo and video storage, compression, and thumbnails | Cloudinary (free tier), with AWS S3 as an alternative | 🟡 |
 | Image handling and upload checks | Pillow and python-magic (checks real file type) | 🟡 |
-| Email (password reset, verification) | Console email backend in development; SendGrid or Mailgun in production | 🟡 |
+| Email (password reset, verification) | Console email backend in development; an email service with a free tier and an HTTPS API when deployed (the free host blocks normal email ports) | 🟡 |
 | Containers | Docker and Docker Compose (web, database, Redis, Celery worker) | ✅ |
 | Testing | pytest and pytest-django | 🟡 |
 | Code quality | Ruff (linter and formatter) | 🟡 |
 | CI (runs tests on each push) | GitHub Actions | 🟡 |
-| Hosting | Render, Railway, or Fly.io | 🟡 |
+| Hosting | **Render** free tier (web service and Key Value/Redis) | 🟡 |
 | Version control | Git and GitHub | ✅ |
 | Logo and diagrams for the README | Canva or Figma (logo), draw.io or Excalidraw (diagrams) | ✅ |
 
@@ -297,6 +297,31 @@ Unread counts come from comparing `Membership.last_read_at` against message time
 
 ---
 
-## 6. Overall feasibility
+## 6. Free deployment plan
+
+Clique is a resume and portfolio project, so it will be deployed using **only free tiers**. The only real cost is AI usage (a few cents to a few dollars a month), kept under control with a spending limit.
+
+| Part | Free service | Free-tier limits | How Clique handles it |
+|---|---|---|---|
+| **Web app** (Django and WebSockets with Daphne) | Render free web service | Sleeps after 15 minutes with no visitors; the first visit after that takes about a minute. 750 free hours a month (enough for one app running all month). 512 MB RAM | Note in the README: "The demo may take up to a minute to wake up." Include a GIF or short video so recruiters can see the app right away |
+| **Database** | Neon free Postgres | 0.5 GB storage, 100 compute hours a month; pauses when idle and wakes automatically | Plenty for a demo. Text messages are tiny, and photos and videos live in Cloudinary, not the database. *(Render's free database is deleted after 30 days, so it isn't used.)* |
+| **Redis** (real-time messaging and rate limits) | Render free Key Value | Small memory, nothing saved to disk | Only used for passing live messages and counting AI requests, so losing it on restart is fine |
+| **Background jobs** | No free worker service | — | Celery runs with Docker Compose during development. In production, Celery's "eager" setting runs tasks inline in the web app instead, so the code stays the same and no extra service is needed |
+| **Photos and videos** | Cloudinary free plan | 25 credits a month (about 25 GB of storage and bandwidth combined). It pauses instead of charging when you go over | Upload limits (10 MB photos, 50 MB videos) keep usage small |
+| **Email** | An email service with a free tier and an HTTPS API | Render's free tier blocks normal email (SMTP) ports | Send password-reset emails through the service's API. Email verification can be turned off for the demo |
+| **AI** | Claude API (pay per use, no free tier) | — | Monthly spending limit in the Anthropic Console (e.g. $5), a daily limit per user, and a smaller limit on the guest demo account |
+| **Domain** | Free `*.onrender.com` address | — | Skip a custom domain. Optional: check the GitHub Student Developer Pack for a free one |
+| **CI** | GitHub Actions | Free for public repositories | Runs tests on every push |
+
+**Total: $0 a month for hosting, plus a small amount for AI.**
+
+Rules to keep it free:
+1. Build and test locally with Docker Compose; deploy only once phases 0–4 work.
+2. Seed the guest demo account with sample chats so it looks good right away.
+3. Optional: add a "Reset demo" admin command so the demo data can be restored anytime.
+
+---
+
+## 7. Overall feasibility
 
 About **two-thirds of the features are things you've already built** (forms, login, CRUD, permissions, SQL relationships). The new skills are WebSockets (Channels), Redis/Celery, cloud media storage, the Claude API, and deployment. Each one is widely used, well documented, and gives you something new to put on your resume. Phases 0–6 are realistic with your current skills. Phase 7 (the reply agent) is a stretch, but you'll be ready for it once the basic AI features work. Version 2 items are optional, so they can't stop you from finishing.
