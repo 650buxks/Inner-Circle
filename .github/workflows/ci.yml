@@ -9,9 +9,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # Images come from Google's Docker Hub mirror, which avoids Docker Hub's download limits.
     services:
       postgres:
-        image: postgres:17-alpine
+        image: mirror.gcr.io/library/postgres:17-alpine
         env:
           POSTGRES_DB: clique
           POSTGRES_USER: clique
@@ -24,7 +25,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       redis:
-        image: redis:8-alpine
+        image: mirror.gcr.io/library/redis:8-alpine
         ports:
           - 6379:6379
         options: >-
