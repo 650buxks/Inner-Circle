@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="text-center mb-5">
+  <h1 class="display-4 fw-bold clique-brand">Clique</h1>
+  <p class="lead text-body-secondary">Your people, your chats, a little help from AI.</p>
+</div>
+
+<div class="card mx-auto" style="max-width: 28rem;">
+  <div class="card-body">
+    <h2 class="h5 card-title">Clique is running ✅</h2>
+    <p class="text-body-secondary small">Phase 0 setup check</p>
+    <ul class="list-group list-group-flush">
+      {% for name, status in services.items %}
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-capitalize">{{ name }}</span>
+          {% if status == "ok" %}
+            <span class="badge text-bg-success">ok</span>
+          {% elif status == "error" %}
+            <span class="badge text-bg-danger">error</span>
+          {% else %}
+            <span class="badge text-bg-secondary">{{ status }}</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

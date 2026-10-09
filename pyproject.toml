@@ -1,0 +1,22 @@
+[project]
+name = "clique"
+version = "0.1.0"
+description = "A private messaging app for close friends, with an AI assistant."
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["tests.py", "test_*.py"]
+filterwarnings = [
+    # WhiteNoise warns when `collectstatic` hasn't been run, which tests don't need.
+    "ignore:No directory at:UserWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+# E/F: errors and bugs, I: import sorting, UP: modern Python syntax, B: common mistakes, DJ: Django rules
+select = ["E", "F", "I", "UP", "B", "DJ"]

@@ -237,8 +237,8 @@ Cheaper models (Claude Sonnet 5.5 at $2/$10, Claude Haiku 4.5 at $1/$5) are also
 
 | Purpose | Tool | Difficulty |
 |---|---|---|
-| Language | Python 3.12 | ✅ |
-| Web framework | Django 5 | ✅ |
+| Language | Python 3.14 | ✅ |
+| Web framework | Django 6 | ✅ |
 | REST API (AJAX calls, uploads, and a possible future mobile/React app) | Django REST Framework | ✅ |
 | Real-time messaging (WebSockets) | Django Channels and Daphne | 🟡 |
 | Message delivery between server processes, plus cache and rate limits | Redis | 🟡 |
