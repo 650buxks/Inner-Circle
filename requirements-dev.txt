@@ -1,0 +1,5 @@
+# Extra tools for development and CI (tests, linting). Not installed in production.
+-r requirements.txt
+pytest>=9.1,<10
+pytest-django>=4.14,<5
+ruff>=0.17,<0.18

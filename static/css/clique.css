@@ -1,0 +1,8 @@
+/* Clique's own styles, on top of Bootstrap. */
+:root {
+  --clique-purple: #6d28d9;
+}
+
+.clique-brand {
+  color: var(--clique-purple);
+}

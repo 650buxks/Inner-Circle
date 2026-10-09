@@ -1,0 +1,9 @@
+# Packages the app needs to run (in Docker, CI and production).
+Django>=6.1,<6.2
+channels>=4.3,<5
+channels-redis>=4.3,<5
+daphne>=4.2,<5
+celery[redis]>=5.6,<6
+psycopg[binary]>=3.3,<4
+django-environ>=0.14,<1
+whitenoise>=6.12,<7
