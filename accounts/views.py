@@ -1,7 +1,8 @@
 from django.contrib.auth import login
+from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect, render
 
-from .forms import SignUpForm
+from .forms import LoginForm, SignUpForm
 
 
 def signup(request):
@@ -19,3 +20,15 @@ def signup(request):
         form = SignUpForm()
 
     return render(request, "accounts/signup.html", {"form": form})
+
+
+class CliqueLoginView(LoginView):
+    template_name = "accounts/login.html"
+    authentication_form = LoginForm
+    redirect_authenticated_user = True
+
+    def form_valid(self, form):
+        if not form.cleaned_data["remember_me"]:
+            # Log out when the browser closes.
+            self.request.session.set_expiry(0)
+        return super().form_valid(form)

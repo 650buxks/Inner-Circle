@@ -43,7 +43,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # serves CSS/JS in production
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -73,18 +73,29 @@ ASGI_APPLICATION = "config.asgi.application"
 
 # --- Database ---------------------------------------------------------------
 
-# Docker Compose sets DATABASE_URL to the Postgres container. Without it, Django
-# falls back to a local SQLite file so quick experiments still work.
+# Docker Compose sets DATABASE_URL to the Postgres container. Without it,
+# Django falls back to a local SQLite file so quick experiments still work.
 DATABASES = {
-    "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
+    "default": env.db(
+        "DATABASE_URL",
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+    ),
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- Users ------------------------------------------------------------------
 
-# Our own user model (accounts.User) instead of Django's built-in one, so we can
-# add profile fields later. This has to be set before the first migration.
+# Our own user model (accounts.User) instead of Django's built-in one, so we
+# can add profile fields later. This has to be set before the first migration.
 AUTH_USER_MODEL = "accounts.User"
+
+# Our login check accepts a username or an email (see accounts/backends.py).
+AUTHENTICATION_BACKENDS = ["accounts.backends.EmailOrUsernameBackend"]
+
+# Where to send people: the login page, and the page after logging in or out.
+LOGIN_URL = "accounts:login"
+LOGIN_REDIRECT_URL = "core:home"
+LOGOUT_REDIRECT_URL = "core:home"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
