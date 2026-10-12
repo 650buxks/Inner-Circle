@@ -1,24 +1,32 @@
 import pytest
 from django.contrib.auth import get_user_model
+<<<<<<< HEAD
 from django.urls import reverse
 
 User = get_user_model()
 
 SIGNUP_PASSWORD = "clique-test-pass-123"
+=======
+>>>>>>> phase-1-profile
 
 
 @pytest.mark.django_db
 def test_name_falls_back_to_username():
+<<<<<<< HEAD
     user = User.objects.create_user(
         username="francis",
         password="s3cure-pass!",
     )
+=======
+    user = get_user_model().objects.create_user(username="francis", password="s3cure-pass!")
+>>>>>>> phase-1-profile
 
     assert user.name == "francis"
 
 
 @pytest.mark.django_db
 def test_name_uses_display_name_when_set():
+<<<<<<< HEAD
     user = User.objects.create_user(
         username="francis",
         password="s3cure-pass!",
@@ -77,3 +85,10 @@ def test_signup_rejects_duplicate_email(client):
     assert response.status_code == 200  # form shown again, no redirect
     assert error in response.content.decode()
     assert not User.objects.filter(username="someone-else").exists()
+=======
+    user = get_user_model().objects.create_user(
+        username="francis", password="s3cure-pass!", display_name="Francis Isip"
+    )
+
+    assert user.name == "Francis Isip"
+>>>>>>> phase-1-profile
