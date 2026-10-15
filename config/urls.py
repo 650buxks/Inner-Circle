@@ -6,4 +6,5 @@ urlpatterns = [
     path("accounts/", include("accounts.urls")),
     path("", include("core.urls")),
     path("friends/", include("friends.urls")),
+    path("chats/", include("chats.urls")),
 ]

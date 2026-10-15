@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from django.urls import reverse
 
 from friends.services import block_user
 
@@ -201,3 +202,107 @@ def test_unread_count(chat, francis, jordan):
     mark_read(francis, chat)
 
     assert unread_count(francis, chat) == 0
+
+
+# --- Inbox and chat page --------------------------------------------------
+
+
+@pytest.fixture
+def logged_in(client, francis):
+    client.force_login(francis)
+    return client
+
+
+def test_inbox_requires_login(client):
+    response = client.get(reverse("chats:inbox"))
+
+    assert response.status_code == 302
+
+
+def test_home_page_sends_logged_in_people_to_inbox(logged_in):
+    response = logged_in.get(reverse("core:home"))
+
+    assert response.url == reverse("chats:inbox")
+
+
+def test_inbox_when_you_have_no_chats(logged_in):
+    response = logged_in.get(reverse("chats:inbox"))
+
+    assert "No chats yet" in response.content.decode()
+
+
+def test_inbox_shows_chats_with_preview_and_unread(logged_in, chat, jordan):
+    send_message(jordan, chat, "Are you coming tonight?")
+
+    response = logged_in.get(reverse("chats:inbox"))
+
+    page = response.content.decode()
+    assert "jordan" in page
+    assert "Are you coming tonight?" in page
+    assert response.context["chats"][0].unread == 1
+
+
+def test_inbox_preview_marks_your_own_messages(logged_in, chat, francis):
+    send_message(francis, chat, "On my way")
+
+    response = logged_in.get(reverse("chats:inbox"))
+
+    assert "You: On my way" in response.content.decode()
+
+
+def test_inbox_shows_newest_chat_first(logged_in, francis, jordan, sam):
+    older = get_or_create_private_chat(francis, jordan)
+    newer = get_or_create_private_chat(francis, sam)
+    send_message(sam, newer, "Hi")
+
+    response = logged_in.get(reverse("chats:inbox"))
+
+    assert response.context["chats"] == [newer, older]
+
+
+def test_message_button_starts_chat(logged_in, francis, jordan):
+    response = logged_in.post(reverse("chats:start", args=["jordan"]))
+
+    chat = Conversation.objects.get()
+    assert response.url == reverse("chats:detail", args=[chat.pk])
+    assert set(chat.members.all()) == {francis, jordan}
+
+
+def test_message_button_for_non_friend_shows_error(logged_in):
+    User.objects.create_user(username="stranger", password="pass")
+
+    response = logged_in.post(reverse("chats:start", args=["stranger"]))
+
+    assert response.url == reverse("accounts:profile", args=["stranger"])
+    assert not Conversation.objects.exists()
+
+
+def test_chat_page_shows_messages(logged_in, chat, jordan):
+    send_message(jordan, chat, "See you at 7")
+
+    response = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    assert "See you at 7" in response.content.decode()
+
+
+def test_opening_chat_marks_it_read(logged_in, chat, francis, jordan):
+    send_message(jordan, chat, "Hello")
+
+    logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    assert unread_count(francis, chat) == 0
+
+
+def test_outsiders_cannot_open_a_chat(client, chat):
+    outsider = User.objects.create_user(username="outsider", password="pass")
+    client.force_login(outsider)
+
+    response = client.get(reverse("chats:detail", args=[chat.pk]))
+
+    assert response.status_code == 404
+
+
+def test_friend_buttons_include_message(logged_in, jordan):
+    response = logged_in.get(reverse("accounts:profile", args=["jordan"]))
+
+    assert reverse("chats:start", args=["jordan"]) in response.content.decode()
