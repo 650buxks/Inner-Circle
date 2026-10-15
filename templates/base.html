@@ -14,6 +14,7 @@
       {% if user.is_authenticated %}
         <div class="d-flex align-items-center gap-3">
           <a class="navbar-text text-decoration-none" href="{% url 'accounts:profile' user.username %}">Hi, {{ user.name }}</a>
+          <a class="btn btn-link btn-sm" href="{% url 'accounts:settings' %}">Settings</a>
           <form method="post" action="{% url 'accounts:logout' %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-outline-secondary btn-sm">Log out</button>

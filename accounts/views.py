@@ -1,10 +1,19 @@
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
-from .forms import LoginForm, ProfileForm, SignUpForm
+from .forms import (
+    AISettingsForm,
+    ChangeEmailForm,
+    ChangePasswordForm,
+    DeleteAccountForm,
+    LoginForm,
+    ProfileForm,
+    SignUpForm,
+)
 from .models import User
 
 
@@ -60,3 +69,71 @@ def edit_profile(request):
         form = ProfileForm(instance=me)
 
     return render(request, "accounts/edit_profile.html", {"form": form})
+
+
+def settings_page(request, **forms):
+    """Show the settings page. Any form passed in (with its errors) replaces
+    the empty version of that form."""
+    user = request.user
+    context = {
+        "email_form": ChangeEmailForm(user=user),
+        "password_form": ChangePasswordForm(user),
+        "ai_form": AISettingsForm(instance=user),
+        "delete_form": DeleteAccountForm(user=user),
+    }
+    context.update(forms)
+    return render(request, "accounts/settings.html", context)
+
+
+@login_required
+def account_settings(request):
+    return settings_page(request)
+
+
+@login_required
+@require_POST
+def change_email(request):
+    form = ChangeEmailForm(request.POST, user=request.user)
+    if form.is_valid():
+        request.user.email = form.cleaned_data["email"]
+        request.user.save(update_fields=["email"])
+        messages.success(request, "Your email has been updated.")
+        return redirect("accounts:settings")
+    return settings_page(request, email_form=form)
+
+
+@login_required
+@require_POST
+def change_password(request):
+    form = ChangePasswordForm(request.user, request.POST)
+    if form.is_valid():
+        user = form.save()
+        # Changing the password logs out every session, including this
+        # one. This keeps you logged in here.
+        update_session_auth_hash(request, user)
+        messages.success(request, "Your password has been changed.")
+        return redirect("accounts:settings")
+    return settings_page(request, password_form=form)
+
+
+@login_required
+@require_POST
+def update_ai_settings(request):
+    form = AISettingsForm(request.POST, instance=request.user)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Your AI settings have been saved.")
+    return redirect("accounts:settings")
+
+
+@login_required
+@require_POST
+def delete_account(request):
+    form = DeleteAccountForm(request.POST, user=request.user)
+    if form.is_valid():
+        user = request.user
+        logout(request)
+        user.delete()
+        messages.success(request, "Your account has been deleted.")
+        return redirect("core:home")
+    return settings_page(request, delete_form=form)

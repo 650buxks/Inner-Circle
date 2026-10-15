@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Settings · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 36rem;">
+  <h1 class="h3 mb-4">Settings</h1>
+
+  <div class="card mb-4">
+    <div class="card-body p-4">
+      <h2 class="h5">Email</h2>
+      <p class="text-body-secondary small">Currently <strong>{{ user.email|default:"not set" }}</strong></p>
+      <form method="post" action="{% url 'accounts:change_email' %}" novalidate>
+        {% csrf_token %}
+        {% for field in email_form %}{% include "accounts/_field.html" %}{% endfor %}
+        <button type="submit" class="btn btn-primary">Update email</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body p-4">
+      <h2 class="h5 mb-3">Password</h2>
+      <form method="post" action="{% url 'accounts:change_password' %}" novalidate>
+        {% csrf_token %}
+        {% for field in password_form %}{% include "accounts/_field.html" %}{% endfor %}
+        <button type="submit" class="btn btn-primary">Change password</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body p-4">
+      <h2 class="h5 mb-3">AI settings</h2>
+      <form method="post" action="{% url 'accounts:ai_settings' %}">
+        {% csrf_token %}
+        {% for field in ai_form %}{% include "accounts/_field.html" %}{% endfor %}
+        <button type="submit" class="btn btn-primary">Save AI settings</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-danger">
+    <div class="card-body p-4">
+      <h2 class="h5 text-danger">Delete account</h2>
+      <p class="small">
+        This permanently deletes your profile and friendships. Messages you sent
+        will show as "Deleted user". This can't be undone.
+      </p>
+      <form method="post" action="{% url 'accounts:delete_account' %}" novalidate>
+        {% csrf_token %}
+        {% for field in delete_form %}{% include "accounts/_field.html" %}{% endfor %}
+        <button type="submit" class="btn btn-danger">Delete my account</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

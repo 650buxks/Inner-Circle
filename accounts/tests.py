@@ -237,3 +237,133 @@ def test_edit_profile_rejects_taken_username(client, francis):
     assert "already exists" in response.content.decode()
     francis.refresh_from_db()
     assert francis.username == "francis"
+
+
+NEW_PASSWORD = "brand-new-pass-456"
+
+
+@pytest.fixture
+def logged_in(client, francis):
+    """A test browser that's already logged in as francis."""
+    client.force_login(francis)
+    return client
+
+
+def test_settings_requires_login(client):
+    response = client.get(reverse("accounts:settings"))
+
+    assert response.status_code == 302
+    assert response.url.startswith(reverse("accounts:login"))
+
+
+def test_settings_page_loads(logged_in):
+    response = logged_in.get(reverse("accounts:settings"))
+
+    page = response.content.decode()
+    assert response.status_code == 200
+    assert "francis@example.com" in page
+    assert "Delete my account" in page
+
+
+def test_change_email(logged_in, francis):
+    response = logged_in.post(
+        reverse("accounts:change_email"),
+        {"email": "new@example.com", "current_password": SIGNUP_PASSWORD},
+    )
+
+    assert response.status_code == 302
+    francis.refresh_from_db()
+    assert francis.email == "new@example.com"
+
+
+def test_change_email_needs_correct_password(logged_in, francis):
+    response = logged_in.post(
+        reverse("accounts:change_email"),
+        {"email": "new@example.com", "current_password": "wrong"},
+    )
+
+    assert "Your password is incorrect." in response.content.decode()
+    francis.refresh_from_db()
+    assert francis.email == "francis@example.com"
+
+
+def test_change_email_rejects_taken_email(logged_in, francis):
+    User.objects.create_user(
+        username="jordan",
+        email="jordan@example.com",
+        password=SIGNUP_PASSWORD,
+    )
+
+    response = logged_in.post(
+        reverse("accounts:change_email"),
+        {"email": "JORDAN@example.com", "current_password": SIGNUP_PASSWORD},
+    )
+
+    error = "An account with this email already exists."
+    assert error in response.content.decode()
+
+
+def test_change_password_keeps_you_logged_in(logged_in, francis):
+    response = logged_in.post(
+        reverse("accounts:change_password"),
+        {
+            "old_password": SIGNUP_PASSWORD,
+            "new_password1": NEW_PASSWORD,
+            "new_password2": NEW_PASSWORD,
+        },
+    )
+
+    assert response.status_code == 302
+    francis.refresh_from_db()
+    assert francis.check_password(NEW_PASSWORD)
+    assert logged_in_user_id(logged_in) == str(francis.pk)
+
+
+def test_change_password_rejects_wrong_old_password(logged_in, francis):
+    logged_in.post(
+        reverse("accounts:change_password"),
+        {
+            "old_password": "wrong",
+            "new_password1": NEW_PASSWORD,
+            "new_password2": NEW_PASSWORD,
+        },
+    )
+
+    francis.refresh_from_db()
+    assert francis.check_password(SIGNUP_PASSWORD)
+
+
+def test_update_ai_settings(logged_in, francis):
+    # Unticked checkboxes aren't sent at all, so this turns smart replies
+    # off and opts out of AI summaries.
+    logged_in.post(reverse("accounts:ai_settings"), {"ai_opt_out": "on"})
+
+    francis.refresh_from_db()
+    assert francis.ai_opt_out is True
+    assert francis.smart_replies_on is False
+
+
+def test_delete_account_needs_correct_password(logged_in, francis):
+    logged_in.post(
+        reverse("accounts:delete_account"),
+        {"current_password": "wrong"},
+    )
+
+    assert User.objects.filter(pk=francis.pk).exists()
+
+
+def test_delete_account(logged_in, francis):
+    response = logged_in.post(
+        reverse("accounts:delete_account"),
+        {"current_password": SIGNUP_PASSWORD},
+    )
+
+    assert response.status_code == 302
+    assert not User.objects.filter(pk=francis.pk).exists()
+    assert logged_in_user_id(logged_in) is None
+
+
+def test_settings_actions_only_accept_post(logged_in):
+    response = logged_in.get(reverse("accounts:delete_account"))
+
+    assert response.status_code == 405  # "method not allowed"
