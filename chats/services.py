@@ -1,0 +1,176 @@
+"""The rules for chats and messages.
+
+Like friends/services.py, views call these functions so every rule lives in
+one place.
+"""
+
+from django.db import transaction
+from django.utils import timezone
+
+from friends.services import are_friends, is_blocked_between
+
+from .models import Conversation, Membership, Message
+
+
+class ChatError(Exception):
+    """Raised when an action breaks one of the rules. The message is shown
+    to the user."""
+
+
+def is_member(user, conversation):
+    return conversation.memberships.filter(user=user).exists()
+
+
+def other_person(conversation, user):
+    """In a private chat, the person who isn't `user` (None if they deleted
+    their account)."""
+    membership = conversation.memberships.exclude(user=user).first()
+    return membership.user if membership else None
+
+
+def chat_title(conversation, user):
+    """What `user` sees as the chat's name."""
+    if conversation.kind == Conversation.Kind.GROUP:
+        return conversation.name
+    person = other_person(conversation, user)
+    return person.name if person else "Deleted user"
+
+
+def private_key(user, other):
+    low, high = sorted([user.pk, other.pk])
+    return f"{low}:{high}"
+
+
+@transaction.atomic
+def get_or_create_private_chat(user, other):
+    """Open the private chat between two people, creating it if needed."""
+    if user == other:
+        raise ChatError("You can't start a chat with yourself.")
+    if is_blocked_between(user, other):
+        raise ChatError("You can't message this person.")
+
+    existing = Conversation.objects.filter(
+        private_key=private_key(user, other),
+    ).first()
+    if existing:
+        return existing
+
+    if not are_friends(user, other):
+        raise ChatError("You can only start chats with friends.")
+
+    conversation = Conversation.objects.create(
+        kind=Conversation.Kind.PRIVATE,
+        private_key=private_key(user, other),
+        created_by=user,
+    )
+    Membership.objects.create(conversation=conversation, user=user)
+    Membership.objects.create(conversation=conversation, user=other)
+    return conversation
+
+
+@transaction.atomic
+def create_group(creator, name, members):
+    """Create a group chat. The creator becomes its admin."""
+    name = name.strip()
+    if not name:
+        raise ChatError("Give your group a name.")
+    others = [person for person in members if person != creator]
+    if not others:
+        raise ChatError("Add at least one friend to the group.")
+    for person in others:
+        if not are_friends(creator, person):
+            raise ChatError(f"{person.name} isn't your friend.")
+
+    conversation = Conversation.objects.create(
+        kind=Conversation.Kind.GROUP,
+        name=name,
+        created_by=creator,
+    )
+    Membership.objects.create(
+        conversation=conversation,
+        user=creator,
+        role=Membership.Role.ADMIN,
+    )
+    for person in others:
+        Membership.objects.create(conversation=conversation, user=person)
+    add_system_message(conversation, f"{creator.name} created the group")
+    return conversation
+
+
+def add_system_message(conversation, text):
+    return _save_message(
+        conversation,
+        sender=None,
+        body=text,
+        kind=Message.Kind.SYSTEM,
+    )
+
+
+@transaction.atomic
+def send_message(user, conversation, body):
+    body = body.strip()
+    if not body:
+        raise ChatError("You can't send an empty message.")
+    if len(body) > Message.MAX_LENGTH:
+        limit = Message.MAX_LENGTH
+        raise ChatError(f"Messages can be at most {limit} characters.")
+    if not is_member(user, conversation):
+        raise ChatError("You're not in this chat.")
+    if conversation.kind == Conversation.Kind.PRIVATE:
+        person = other_person(conversation, user)
+        if person is None or is_blocked_between(user, person):
+            raise ChatError("You can't message this person.")
+
+    message = _save_message(conversation, sender=user, body=body)
+    mark_read(user, conversation)
+    return message
+
+
+def _save_message(conversation, sender, body, kind=Message.Kind.TEXT):
+    message = Message.objects.create(
+        conversation=conversation,
+        sender=sender,
+        body=body,
+        kind=kind,
+    )
+    conversation.last_activity_at = message.created_at
+    conversation.save(update_fields=["last_activity_at"])
+    return message
+
+
+def edit_message(user, message, new_body):
+    new_body = new_body.strip()
+    if message.sender != user or message.kind != Message.Kind.TEXT:
+        raise ChatError("You can only edit your own messages.")
+    if message.is_deleted:
+        raise ChatError("This message was deleted.")
+    if not new_body:
+        raise ChatError("A message can't be empty.")
+    message.body = new_body
+    message.edited_at = timezone.now()
+    message.save(update_fields=["body", "edited_at"])
+    return message
+
+
+def delete_message(user, message):
+    """Replace the message with "Message deleted" (it keeps its place)."""
+    if message.sender != user or message.kind != Message.Kind.TEXT:
+        raise ChatError("You can only delete your own messages.")
+    message.is_deleted = True
+    message.body = ""
+    message.save(update_fields=["is_deleted", "body"])
+
+
+def mark_read(user, conversation):
+    Membership.objects.filter(conversation=conversation, user=user).update(
+        last_read_at=timezone.now(),
+    )
+
+
+def unread_count(user, conversation):
+    """Messages from other people since `user` last read the chat."""
+    membership = conversation.memberships.get(user=user)
+    messages = conversation.messages.exclude(sender=user)
+    if membership.last_read_at:
+        messages = messages.filter(created_at__gt=membership.last_read_at)
+    return messages.count()
