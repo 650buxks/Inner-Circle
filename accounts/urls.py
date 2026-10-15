@@ -11,4 +11,9 @@ urlpatterns = [
     path("logout/", LogoutView.as_view(), name="logout"),
     path("profile/", views.edit_profile, name="edit_profile"),
     path("u/<str:username>/", views.profile, name="profile"),
+    path("settings/", views.account_settings, name="settings"),
+    path("settings/email/", views.change_email, name="change_email"),
+    path("settings/password/", views.change_password, name="change_password"),
+    path("settings/ai/", views.update_ai_settings, name="ai_settings"),
+    path("settings/delete/", views.delete_account, name="delete_account"),
 ]
