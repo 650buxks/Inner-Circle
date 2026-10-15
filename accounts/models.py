@@ -14,6 +14,18 @@ class User(AbstractUser):
     ai_opt_out = models.BooleanField(default=False)
     smart_replies_on = models.BooleanField(default=True)
 
+    # Friendship goes both ways: adding Jordan to Francis's friends also
+    # adds Francis to Jordan's ("symmetrical" is on by default for "self").
+    friends = models.ManyToManyField("self", blank=True)
+    # Blocking only goes one way, so it isn't symmetrical. People who blocked
+    # this user are available as user.blocked_by.
+    blocked_users = models.ManyToManyField(
+        "self",
+        symmetrical=False,
+        related_name="blocked_by",
+        blank=True,
+    )
+
     @property
     def name(self):
         """

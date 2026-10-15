@@ -20,4 +20,9 @@ class CliqueUserAdmin(UserAdmin):
                 )
             },
         ),
+        ("Friends", {"fields": ("friends", "blocked_users")}),
+    )
+    filter_horizontal = UserAdmin.filter_horizontal + (
+        "friends",
+        "blocked_users",
     )

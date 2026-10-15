@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     # Clique apps
     "accounts",
     "core",
+    "friends",
 ]
 
 MIDDLEWARE = [
