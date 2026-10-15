@@ -2,11 +2,12 @@ import redis
 from django.conf import settings
 from django.db import connection
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 
 def check_services():
-    """Return {"database": "ok" | "error", "redis": "ok" | "error" | "not configured"}."""
+    """Return {"database": "ok" | "error", "redis": "ok" |
+    "error" | "not configured"}."""
     results = {}
 
     try:
@@ -29,11 +30,17 @@ def check_services():
 
 
 def home(request):
+    # Logged-in people go straight to their chats.
+    if request.user.is_authenticated:
+        return redirect("chats:inbox")
     return render(request, "core/home.html", {"services": check_services()})
 
 
 def health(request):
-    """Used by Render (and you) to check that the app and its services are up."""
+    """
+    Used by Render (and you) to check that the app
+    and its services are up.
+    """
     services = check_services()
     healthy = "error" not in services.values()
     return JsonResponse(

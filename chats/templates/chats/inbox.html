@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Chats · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 36rem;">
+  <h1 class="h3 mb-4">Chats</h1>
+
+  {% if chats %}
+    <div class="list-group">
+      {% for chat in chats %}
+        <a href="{% url 'chats:detail' chat.pk %}"
+           class="list-group-item list-group-item-action d-flex align-items-center gap-3">
+          <div class="avatar avatar-sm">{{ chat.title|first|upper }}</div>
+          <div class="flex-grow-1 text-truncate">
+            <div class="d-flex justify-content-between">
+              <span class="{% if chat.unread %}fw-bold{% else %}fw-semibold{% endif %}">{{ chat.title }}</span>
+              {% if chat.last_message %}
+                <small class="text-body-secondary">{{ chat.last_message.created_at|timesince }} ago</small>
+              {% endif %}
+            </div>
+            <div class="small text-truncate {% if chat.unread %}text-body{% else %}text-body-secondary{% endif %}">
+              {{ chat.preview }}
+            </div>
+          </div>
+          {% if chat.unread %}
+            <span class="badge rounded-pill text-bg-primary">{{ chat.unread }}</span>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-body-secondary">
+      No chats yet. Open a friend's profile and press <strong>Message</strong> to start one.
+      <a href="{% url 'friends:list' %}">Go to your friends</a>
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

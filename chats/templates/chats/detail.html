@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 36rem;">
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{% url 'chats:inbox' %}" class="btn btn-link btn-sm px-0">&larr; Chats</a>
+    <div class="avatar avatar-sm">{{ title|first|upper }}</div>
+    <h1 class="h5 mb-0">{{ title }}</h1>
+  </div>
+
+  {% for message in chat_messages %}
+    {% if message.kind == "system" %}
+      <p class="text-center text-body-secondary small my-3">{{ message.body }}</p>
+    {% else %}
+      <div class="mb-3 {% if message.sender == user %}text-end{% endif %}">
+        <div class="small text-body-secondary">{{ message.sender_name }} · {{ message.created_at|time:"g:i A" }}</div>
+        {% if message.is_deleted %}
+          <div class="d-inline-block px-3 py-2 rounded-3 border fst-italic text-body-secondary">Message deleted</div>
+        {% else %}
+          <div class="d-inline-block px-3 py-2 rounded-3 {% if message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% empty %}
+    <p class="text-center text-body-secondary">No messages yet. Say hi! 👋</p>
+  {% endfor %}
+
+  <p class="text-center text-body-secondary small mt-4">Sending messages comes in the next task.</p>
+</div>
+{% endblock %}

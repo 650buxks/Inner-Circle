@@ -288,7 +288,7 @@ def test_requests_page_lists_received_and_sent(logged_in, francis, jordan):
 def test_navbar_shows_request_count(logged_in, francis, jordan):
     send_friend_request(jordan, francis)
 
-    response = logged_in.get(reverse("core:home"))
+    response = logged_in.get(reverse("friends:list"))
 
     assert response.context["friend_request_count"] == 1
 
