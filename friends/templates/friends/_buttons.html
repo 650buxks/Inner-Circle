@@ -1,0 +1,27 @@
+{# Friend buttons for one person. Needs `person` and `relationship`. #}
+{% if relationship == "none" %}
+  <form method="post" action="{% url 'friends:send_request' person.username %}" class="d-inline">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="btn btn-primary btn-sm">Add friend</button>
+  </form>
+{% elif relationship == "request_sent" %}
+  <form method="post" action="{% url 'friends:cancel' person.username %}" class="d-inline">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="btn btn-outline-secondary btn-sm">Cancel request</button>
+  </form>
+{% elif relationship == "request_received" %}
+  <form method="post" action="{% url 'friends:accept' person.username %}" class="d-inline">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="btn btn-primary btn-sm">Accept</button>
+  </form>
+  <form method="post" action="{% url 'friends:decline' person.username %}" class="d-inline">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="btn btn-outline-secondary btn-sm">Decline</button>
+  </form>
+{% elif relationship == "friends" %}
+  <span class="badge text-bg-success">Friends ✓</span>
+{% endif %}

@@ -191,3 +191,119 @@ def test_search_shows_relationship(logged_in, francis, jordan):
     send_friend_request(francis, jordan)
 
     assert "Request sent" in search(logged_in, "jordan")
+
+
+# --- Friend request buttons and Requests page ---------------------------
+
+
+def press(client, url_name, username, next_url="/"):
+    """Press one of the friend buttons (they're all small POST forms)."""
+    url = reverse(f"friends:{url_name}", args=[username])
+    return client.post(url, {"next": next_url})
+
+
+def test_add_friend_button_sends_request(logged_in, francis, jordan):
+    response = press(logged_in, "send_request", "jordan")
+
+    assert response.status_code == 302
+    assert relationship(francis, jordan) == "request_sent"
+
+
+def test_add_yourself_shows_error_message(logged_in):
+    response = press(logged_in, "send_request", "francis")
+
+    assert response.status_code == 302
+    assert FriendRequest.objects.count() == 0
+
+
+def test_accept_button(logged_in, francis, jordan):
+    send_friend_request(jordan, francis)
+
+    press(logged_in, "accept", "jordan")
+
+    assert are_friends(francis, jordan)
+
+
+def test_decline_button(logged_in, francis, jordan):
+    send_friend_request(jordan, francis)
+
+    press(logged_in, "decline", "jordan")
+
+    assert relationship(francis, jordan) == "none"
+
+
+def test_cancel_button(logged_in, francis, jordan):
+    send_friend_request(francis, jordan)
+
+    press(logged_in, "cancel", "jordan")
+
+    assert relationship(francis, jordan) == "none"
+
+
+def test_cannot_accept_a_request_sent_to_someone_else(logged_in, jordan):
+    sam = User.objects.create_user(username="sam", password="pass")
+    send_friend_request(jordan, sam)
+
+    # Francis tries to accept Jordan's request to Sam.
+    response = press(logged_in, "accept", "jordan")
+
+    assert response.status_code == 404
+    assert not are_friends(jordan, sam)
+
+
+def test_buttons_only_accept_post(logged_in, jordan):
+    url = reverse("friends:send_request", args=["jordan"])
+
+    response = logged_in.get(url)
+
+    assert response.status_code == 405
+
+
+def test_buttons_redirect_back_to_safe_pages_only(logged_in, jordan):
+    response = press(
+        logged_in,
+        "send_request",
+        "jordan",
+        next_url="https://evil.example.com/",
+    )
+
+    assert response.url == reverse("friends:requests")
+
+
+def test_requests_page_lists_received_and_sent(logged_in, francis, jordan):
+    sam = User.objects.create_user(username="sam", password="pass")
+    send_friend_request(jordan, francis)
+    send_friend_request(francis, sam)
+
+    response = logged_in.get(reverse("friends:requests"))
+
+    page = response.content.decode()
+    assert "@jordan" in page
+    assert "@sam" in page
+    assert "Accept" in page
+    assert "Cancel request" in page
+
+
+def test_navbar_shows_request_count(logged_in, francis, jordan):
+    send_friend_request(jordan, francis)
+
+    response = logged_in.get(reverse("core:home"))
+
+    assert response.context["friend_request_count"] == 1
+
+
+def test_profile_shows_add_friend_button(logged_in, jordan):
+    url = reverse("accounts:profile", args=["jordan"])
+
+    response = logged_in.get(url)
+
+    assert "Add friend" in response.content.decode()
+
+
+def test_profile_shows_accept_button(logged_in, francis, jordan):
+    send_friend_request(jordan, francis)
+    url = reverse("accounts:profile", args=["jordan"])
+
+    response = logged_in.get(url)
+
+    assert "Accept" in response.content.decode()

@@ -25,7 +25,7 @@
     {% if is_me %}
       <a class="btn btn-primary" href="{% url 'accounts:edit_profile' %}">Edit profile</a>
     {% else %}
-      <button class="btn btn-outline-primary" disabled title="Friends arrive in Phase 2">Add friend</button>
+      {% include "friends/_buttons.html" %}
     {% endif %}
   </div>
 </div>
