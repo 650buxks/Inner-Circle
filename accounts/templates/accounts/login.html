@@ -26,6 +26,9 @@
         <label class="form-label" for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
         {{ form.password }}
       </div>
+      <p class="text-end small mb-3">
+        <a href="{% url 'accounts:password_reset' %}">Forgot password?</a>
+      </p>
 
       <div class="form-check mb-3">
         {{ form.remember_me }}

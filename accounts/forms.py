@@ -2,6 +2,8 @@ from django import forms
 from django.contrib.auth.forms import (
     AuthenticationForm,
     PasswordChangeForm,
+    PasswordResetForm,
+    SetPasswordForm,
     UserCreationForm,
 )
 
@@ -127,3 +129,11 @@ class DeleteAccountForm(PasswordCheckMixin, StyledFormMixin, forms.Form):
         label="Type your password to confirm",
         widget=forms.PasswordInput,
     )
+
+
+class ResetRequestForm(StyledFormMixin, PasswordResetForm):
+    """Django's "email me a reset link" form, with Bootstrap styling."""
+
+
+class NewPasswordForm(StyledFormMixin, SetPasswordForm):
+    """Django's "choose a new password" form, with Bootstrap styling."""
