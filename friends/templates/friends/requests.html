@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Friend requests · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 36rem;">
+  <h1 class="h3 mb-4">Friend requests</h1>
+
+  <h2 class="h6 text-uppercase text-body-secondary">Received</h2>
+  {% if received %}
+    <ul class="list-group mb-4">
+      {% for friend_request in received %}
+        {% with person=friend_request.from_user relationship="request_received" %}
+          <li class="list-group-item d-flex align-items-center gap-3">
+            <div class="avatar avatar-sm">{{ person.name|first|upper }}</div>
+            <div class="flex-grow-1">
+              <a class="fw-semibold text-decoration-none" href="{% url 'accounts:profile' person.username %}">{{ person.name }}</a>
+              <div class="text-body-secondary small">@{{ person.username }} · {{ friend_request.created_at|timesince }} ago</div>
+            </div>
+            {% include "friends/_buttons.html" %}
+          </li>
+        {% endwith %}
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-body-secondary mb-4">No new friend requests.</p>
+  {% endif %}
+
+  <h2 class="h6 text-uppercase text-body-secondary">Sent</h2>
+  {% if sent %}
+    <ul class="list-group">
+      {% for friend_request in sent %}
+        {% with person=friend_request.to_user relationship="request_sent" %}
+          <li class="list-group-item d-flex align-items-center gap-3">
+            <div class="avatar avatar-sm">{{ person.name|first|upper }}</div>
+            <div class="flex-grow-1">
+              <a class="fw-semibold text-decoration-none" href="{% url 'accounts:profile' person.username %}">{{ person.name }}</a>
+              <div class="text-body-secondary small">@{{ person.username }} · {{ friend_request.created_at|timesince }} ago</div>
+            </div>
+            {% include "friends/_buttons.html" %}
+          </li>
+        {% endwith %}
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-body-secondary">You haven't sent any requests. <a href="{% url 'friends:find' %}">Find people</a></p>
+  {% endif %}
+</div>
+{% endblock %}

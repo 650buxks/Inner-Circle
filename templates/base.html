@@ -15,6 +15,10 @@
         <div class="d-flex align-items-center gap-3">
           <a class="navbar-text text-decoration-none" href="{% url 'accounts:profile' user.username %}">Hi, {{ user.name }}</a>
           <a class="btn btn-link btn-sm" href="{% url 'friends:find' %}">Find people</a>
+          <a class="btn btn-link btn-sm" href="{% url 'friends:requests' %}">
+            Requests
+            {% if friend_request_count %}<span class="badge rounded-pill text-bg-danger">{{ friend_request_count }}</span>{% endif %}
+          </a>
           <a class="btn btn-link btn-sm" href="{% url 'accounts:settings' %}">Settings</a>
           <form method="post" action="{% url 'accounts:logout' %}">
             {% csrf_token %}

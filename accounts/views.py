@@ -12,6 +12,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 
+from friends.services import relationship
+
 from .forms import (
     AISettingsForm,
     ChangeEmailForm,
@@ -58,7 +60,11 @@ class CliqueLoginView(LoginView):
 @login_required
 def profile(request, username):
     person = get_object_or_404(User, username=username)
-    context = {"person": person, "is_me": person == request.user}
+    context = {
+        "person": person,
+        "is_me": person == request.user,
+        "relationship": relationship(request.user, person),
+    }
     return render(request, "accounts/profile.html", context)
 
 
