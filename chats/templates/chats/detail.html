@@ -10,16 +10,35 @@
     <h1 class="h5 mb-0">{{ title }}</h1>
   </div>
 
+  {% if has_older %}
+    <div class="text-center mb-3">
+      <a href="?before={{ chat_messages.0.pk }}" class="btn btn-outline-secondary btn-sm">Load older messages</a>
+    </div>
+  {% endif %}
+
   {% for message in chat_messages %}
     {% if message.kind == "system" %}
       <p class="text-center text-body-secondary small my-3">{{ message.body }}</p>
     {% else %}
       <div class="mb-3 {% if message.sender == user %}text-end{% endif %}">
-        <div class="small text-body-secondary">{{ message.sender_name }} · {{ message.created_at|time:"g:i A" }}</div>
+        <div class="small text-body-secondary">
+          {{ message.sender_name }} · {{ message.created_at|time:"g:i A" }}
+          {% if message.edited_at and not message.is_deleted %}· edited{% endif %}
+        </div>
         {% if message.is_deleted %}
           <div class="d-inline-block px-3 py-2 rounded-3 border fst-italic text-body-secondary">Message deleted</div>
         {% else %}
-          <div class="d-inline-block px-3 py-2 rounded-3 {% if message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
+          <div class="d-inline-block px-3 py-2 rounded-3 text-start {% if message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
+          {% if message.sender == user and message.kind == "text" %}
+            <div class="small">
+              <a href="{% url 'chats:edit' message.pk %}" class="link-secondary">Edit</a>
+              <form method="post" action="{% url 'chats:delete' message.pk %}" class="d-inline"
+                    onsubmit="return confirm('Delete this message?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link btn-sm link-danger p-0 align-baseline">Delete</button>
+              </form>
+            </div>
+          {% endif %}
         {% endif %}
       </div>
     {% endif %}
@@ -27,6 +46,11 @@
     <p class="text-center text-body-secondary">No messages yet. Say hi! 👋</p>
   {% endfor %}
 
-  <p class="text-center text-body-secondary small mt-4">Sending messages comes in the next task.</p>
+  <form method="post" action="{% url 'chats:send' chat.pk %}" id="send" class="d-flex gap-2 mt-4">
+    {% csrf_token %}
+    <textarea name="body" class="form-control" rows="1" maxlength="{{ max_length }}"
+              placeholder="Message {{ title }}" required autofocus></textarea>
+    <button type="submit" class="btn btn-primary">Send</button>
+  </form>
 </div>
 {% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Edit message · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 36rem;">
+  <h1 class="h4 mb-4">Edit message</h1>
+
+  <form method="post">
+    {% csrf_token %}
+    <textarea name="body" class="form-control mb-3" rows="4" maxlength="{{ max_length }}"
+              required autofocus>{{ message.body }}</textarea>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{% url 'chats:detail' chat.pk %}" class="btn btn-link">Cancel</a>
+  </form>
+</div>
+{% endblock %}
