@@ -18,6 +18,11 @@ def are_friends(user, other):
     return user.friends.filter(pk=other.pk).exists()
 
 
+def mutual_friends(user, other):
+    """People who are friends with both `user` and `other`."""
+    return user.friends.filter(pk__in=other.friends.all())
+
+
 def is_blocked_between(user, other):
     """True if either person has blocked the other."""
     return (

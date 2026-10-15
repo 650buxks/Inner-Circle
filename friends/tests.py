@@ -9,6 +9,7 @@ from .services import (
     accept_friend_request,
     are_friends,
     block_user,
+    mutual_friends,
     relationship,
     remove_friend,
     send_friend_request,
@@ -307,3 +308,69 @@ def test_profile_shows_accept_button(logged_in, francis, jordan):
     response = logged_in.get(url)
 
     assert "Accept" in response.content.decode()
+
+
+# --- Friends list, remove friend, mutual friends, private profiles ------
+
+
+def test_friends_page_lists_your_friends(logged_in, francis, jordan):
+    francis.friends.add(jordan)
+
+    response = logged_in.get(reverse("friends:list"))
+
+    assert "@jordan" in response.content.decode()
+
+
+def test_friends_page_when_you_have_none(logged_in):
+    response = logged_in.get(reverse("friends:list"))
+
+    assert "No friends yet" in response.content.decode()
+
+
+def test_remove_friend_button(logged_in, francis, jordan):
+    francis.friends.add(jordan)
+
+    response = press(logged_in, "remove", "jordan")
+
+    assert response.status_code == 302
+    assert not are_friends(francis, jordan)
+
+
+def test_mutual_friends(francis, jordan):
+    sam = User.objects.create_user(username="sam", password="pass")
+    alex = User.objects.create_user(username="alex", password="pass")
+    francis.friends.add(sam, alex)
+    jordan.friends.add(sam)
+
+    assert list(mutual_friends(francis, jordan)) == [sam]
+
+
+def test_profile_shows_mutual_friends(logged_in, francis, jordan):
+    sam = User.objects.create_user(username="sam", password="pass")
+    francis.friends.add(sam)
+    jordan.friends.add(sam)
+
+    response = logged_in.get(reverse("accounts:profile", args=["jordan"]))
+
+    assert "1 mutual friend" in response.content.decode()
+
+
+def test_non_friends_see_a_limited_profile(logged_in, jordan):
+    jordan.bio = "Secret bio"
+    jordan.save()
+
+    response = logged_in.get(reverse("accounts:profile", args=["jordan"]))
+
+    page = response.content.decode()
+    assert "Secret bio" not in page
+    assert "to see their full profile" in page
+
+
+def test_friends_see_the_full_profile(logged_in, francis, jordan):
+    jordan.bio = "Secret bio"
+    jordan.save()
+    francis.friends.add(jordan)
+
+    response = logged_in.get(reverse("accounts:profile", args=["jordan"]))
+
+    assert "Secret bio" in response.content.decode()

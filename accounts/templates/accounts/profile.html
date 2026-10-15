@@ -10,17 +10,31 @@
     <h1 class="h3 mb-0">{{ person.name }}</h1>
     <p class="text-body-secondary">@{{ person.username }}</p>
 
-    {% if person.status_message %}
-      <p class="mb-3"><span class="badge rounded-pill text-bg-light border">{{ person.status_message }}</span></p>
+    {% if show_details %}
+      {% if person.status_message %}
+        <p class="mb-3"><span class="badge rounded-pill text-bg-light border">{{ person.status_message }}</span></p>
+      {% endif %}
+
+      {% if person.bio %}
+        <p class="mb-3">{{ person.bio|linebreaksbr }}</p>
+      {% elif is_me %}
+        <p class="text-body-secondary fst-italic mb-3">You haven't written a bio yet.</p>
+      {% endif %}
+
+      <p class="text-body-secondary small mb-3">Joined {{ person.date_joined|date:"F Y" }}</p>
+    {% else %}
+      <p class="text-body-secondary small mb-3">Add {{ person.name }} as a friend to see their full profile.</p>
     {% endif %}
 
-    {% if person.bio %}
-      <p class="mb-3">{{ person.bio|linebreaksbr }}</p>
-    {% elif is_me %}
-      <p class="text-body-secondary fst-italic mb-3">You haven't written a bio yet.</p>
+    {% if mutual_friends %}
+      <p class="small mb-4">
+        {{ mutual_friends|length }} mutual friend{{ mutual_friends|length|pluralize }}:
+        {% for friend in mutual_friends|slice:":5" %}
+          <a href="{% url 'accounts:profile' friend.username %}">{{ friend.name }}</a>{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+        {% if mutual_friends|length > 5 %}and more{% endif %}
+      </p>
     {% endif %}
-
-    <p class="text-body-secondary small mb-4">Joined {{ person.date_joined|date:"F Y" }}</p>
 
     {% if is_me %}
       <a class="btn btn-primary" href="{% url 'accounts:edit_profile' %}">Edit profile</a>
