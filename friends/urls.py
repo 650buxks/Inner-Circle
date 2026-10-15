@@ -13,4 +13,6 @@ urlpatterns = [
     path("decline/<str:username>/", views.decline_request, name="decline"),
     path("cancel/<str:username>/", views.cancel_request, name="cancel"),
     path("remove/<str:username>/", views.unfriend, name="remove"),
+    path("block/<str:username>/", views.block, name="block"),
+    path("unblock/<str:username>/", views.unblock, name="unblock"),
 ]

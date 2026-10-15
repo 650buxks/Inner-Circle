@@ -8,11 +8,16 @@ from django.contrib.auth.views import (
     PasswordResetDoneView,
     PasswordResetView,
 )
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 
-from friends.services import mutual_friends, relationship
+from friends.services import (
+    accepts_requests_from,
+    mutual_friends,
+    relationship,
+)
 
 from .forms import (
     AISettingsForm,
@@ -21,6 +26,7 @@ from .forms import (
     DeleteAccountForm,
     LoginForm,
     NewPasswordForm,
+    PrivacyForm,
     ProfileForm,
     ResetRequestForm,
     SignUpForm,
@@ -62,6 +68,9 @@ def profile(request, username):
     person = get_object_or_404(User, username=username)
     is_me = person == request.user
     connection = relationship(request.user, person)
+    if connection == "blocked_by":
+        # Act as if the profile doesn't exist for people they've blocked.
+        raise Http404
     mutuals = [] if is_me else list(mutual_friends(request.user, person))
     context = {
         "person": person,
@@ -70,6 +79,7 @@ def profile(request, username):
         # Only you and your friends see your bio, status and join date.
         "show_details": is_me or connection == "friends",
         "mutual_friends": mutuals,
+        "cannot_add": not accepts_requests_from(person, request.user),
     }
     return render(request, "accounts/profile.html", context)
 
@@ -100,7 +110,9 @@ def settings_page(request, **forms):
         "email_form": ChangeEmailForm(user=user),
         "password_form": ChangePasswordForm(user),
         "ai_form": AISettingsForm(instance=user),
+        "privacy_form": PrivacyForm(instance=user),
         "delete_form": DeleteAccountForm(user=user),
+        "blocked_users": user.blocked_users.order_by("username"),
     }
     context.update(forms)
     return render(request, "accounts/settings.html", context)
@@ -144,6 +156,16 @@ def update_ai_settings(request):
     if form.is_valid():
         form.save()
         messages.success(request, "Your AI settings have been saved.")
+    return redirect("accounts:settings")
+
+
+@login_required
+@require_POST
+def update_privacy(request):
+    form = PrivacyForm(request.POST, instance=request.user)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Your privacy settings have been saved.")
     return redirect("accounts:settings")
 
 

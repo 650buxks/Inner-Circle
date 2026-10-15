@@ -23,6 +23,13 @@ def mutual_friends(user, other):
     return user.friends.filter(pk__in=other.friends.all())
 
 
+def accepts_requests_from(user, sender):
+    """Does `user`'s privacy setting let `sender` send them a request?"""
+    if user.friend_requests_from == user.RequestsFrom.FRIENDS_OF_FRIENDS:
+        return mutual_friends(user, sender).exists()
+    return True
+
+
 def is_blocked_between(user, other):
     """True if either person has blocked the other."""
     return (
@@ -74,6 +81,11 @@ def send_friend_request(from_user, to_user):
     if their_request:
         accept_friend_request(their_request)
         return None
+
+    if not accepts_requests_from(to_user, from_user):
+        raise FriendshipError(
+            f"{to_user.name} only accepts requests from friends of friends.",
+        )
 
     request, created = FriendRequest.objects.get_or_create(
         from_user=from_user,

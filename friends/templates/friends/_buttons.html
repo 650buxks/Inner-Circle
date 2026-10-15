@@ -1,5 +1,7 @@
 {# Friend buttons for one person. Needs `person` and `relationship`. #}
-{% if relationship == "none" %}
+{% if relationship == "none" and cannot_add %}
+  <span class="text-body-secondary small">Only accepts requests from friends of friends</span>
+{% elif relationship == "none" %}
   <form method="post" action="{% url 'friends:send_request' person.username %}" class="d-inline">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -29,5 +31,11 @@
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}">
     <button type="submit" class="btn btn-outline-secondary btn-sm">Remove</button>
+  </form>
+{% elif relationship == "blocked" %}
+  <form method="post" action="{% url 'friends:unblock' person.username %}" class="d-inline">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="btn btn-outline-secondary btn-sm">Unblock</button>
   </form>
 {% endif %}

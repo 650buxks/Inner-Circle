@@ -36,4 +36,5 @@ urlpatterns = [
         views.ResetCompleteView.as_view(),
         name="password_reset_complete",
     ),
+    path("settings/privacy/", views.update_privacy, name="privacy"),
 ]

@@ -17,6 +17,7 @@ class CliqueUserAdmin(UserAdmin):
                     "last_seen",
                     "ai_opt_out",
                     "smart_replies_on",
+                    "friend_requests_from",
                 )
             },
         ),

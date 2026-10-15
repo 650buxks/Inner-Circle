@@ -7,12 +7,21 @@ class User(AbstractUser):
     A Clique user: Django's built-in user plus profile and AI settings.
     """
 
+    class RequestsFrom(models.TextChoices):
+        EVERYONE = "everyone", "Everyone"
+        FRIENDS_OF_FRIENDS = "friends_of_friends", "Friends of friends only"
+
     display_name = models.CharField(max_length=50, blank=True)
     bio = models.TextField(max_length=300, blank=True)
     status_message = models.CharField(max_length=80, blank=True)
     last_seen = models.DateTimeField(null=True, blank=True)
     ai_opt_out = models.BooleanField(default=False)
     smart_replies_on = models.BooleanField(default=True)
+    friend_requests_from = models.CharField(
+        max_length=20,
+        choices=RequestsFrom.choices,
+        default=RequestsFrom.EVERYONE,
+    )
 
     # Friendship goes both ways: adding Jordan to Francis's friends also
     # adds Francis to Jordan's ("symmetrical" is on by default for "self").

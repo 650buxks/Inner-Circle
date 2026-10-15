@@ -39,6 +39,36 @@
       </form>
     </div>
   </div>
+  <div class="card mb-4">
+    <div class="card-body p-4">
+      <h2 class="h5 mb-3">Privacy</h2>
+      <form method="post" action="{% url 'accounts:privacy' %}">
+        {% csrf_token %}
+        {% for field in privacy_form %}{% include "accounts/_field.html" %}{% endfor %}
+        <button type="submit" class="btn btn-primary">Save privacy settings</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body p-4">
+      <h2 class="h5 mb-3">Blocked people</h2>
+      {% if blocked_users %}
+        <ul class="list-group">
+          {% for person in blocked_users %}
+            {% with relationship="blocked" %}
+              <li class="list-group-item d-flex align-items-center justify-content-between">
+                <span>{{ person.name }} <span class="text-body-secondary small">@{{ person.username }}</span></span>
+                {% include "friends/_buttons.html" %}
+              </li>
+            {% endwith %}
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-body-secondary small mb-0">You haven't blocked anyone.</p>
+      {% endif %}
+    </div>
+  </div>
 
   <div class="card border-danger">
     <div class="card-body p-4">
