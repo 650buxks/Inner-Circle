@@ -23,5 +23,11 @@
     <button type="submit" class="btn btn-outline-secondary btn-sm">Decline</button>
   </form>
 {% elif relationship == "friends" %}
-  <span class="badge text-bg-success">Friends ✓</span>
+  <span class="badge text-bg-success me-1">Friends ✓</span>
+  <form method="post" action="{% url 'friends:remove' person.username %}" class="d-inline"
+        onsubmit="return confirm('Remove {{ person.name|escapejs }} from your friends?');">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="btn btn-outline-secondary btn-sm">Remove</button>
+  </form>
 {% endif %}

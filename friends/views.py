@@ -14,6 +14,7 @@ from .services import (
     cancel_friend_request,
     decline_friend_request,
     relationship,
+    remove_friend,
     send_friend_request,
 )
 
@@ -60,6 +61,12 @@ def find_people(request):
 
     context = {"query": query, "results": results}
     return render(request, "friends/find.html", context)
+
+
+@login_required
+def friends_list(request):
+    friends = request.user.friends.order_by("username")
+    return render(request, "friends/list.html", {"friends": friends})
 
 
 @login_required
@@ -126,4 +133,13 @@ def cancel_request(request, username):
     )
     cancel_friend_request(friend_request)
     messages.info(request, "Friend request cancelled.")
+    return redirect_back(request)
+
+
+@login_required
+@require_POST
+def unfriend(request, username):
+    person = get_object_or_404(User, username=username)
+    remove_friend(request.user, person)
+    messages.info(request, f"You and {person.name} are no longer friends.")
     return redirect_back(request)

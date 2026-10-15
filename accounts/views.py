@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 
-from friends.services import relationship
+from friends.services import mutual_friends, relationship
 
 from .forms import (
     AISettingsForm,
@@ -60,10 +60,16 @@ class CliqueLoginView(LoginView):
 @login_required
 def profile(request, username):
     person = get_object_or_404(User, username=username)
+    is_me = person == request.user
+    connection = relationship(request.user, person)
+    mutuals = [] if is_me else list(mutual_friends(request.user, person))
     context = {
         "person": person,
-        "is_me": person == request.user,
-        "relationship": relationship(request.user, person),
+        "is_me": is_me,
+        "relationship": connection,
+        # Only you and your friends see your bio, status and join date.
+        "show_details": is_me or connection == "friends",
+        "mutual_friends": mutuals,
     }
     return render(request, "accounts/profile.html", context)
 
