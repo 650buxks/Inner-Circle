@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{{ person.name }} · Clique{% endblock %}
+
+{% block content %}
+<div class="card mx-auto" style="max-width: 36rem;">
+  <div class="card-body p-4 text-center">
+    <div class="avatar avatar-lg mx-auto mb-3">{{ person.name|first|upper }}</div>
+
+    <h1 class="h3 mb-0">{{ person.name }}</h1>
+    <p class="text-body-secondary">@{{ person.username }}</p>
+
+    {% if person.status_message %}
+      <p class="mb-3"><span class="badge rounded-pill text-bg-light border">{{ person.status_message }}</span></p>
+    {% endif %}
+
+    {% if person.bio %}
+      <p class="mb-3">{{ person.bio|linebreaksbr }}</p>
+    {% elif is_me %}
+      <p class="text-body-secondary fst-italic mb-3">You haven't written a bio yet.</p>
+    {% endif %}
+
+    <p class="text-body-secondary small mb-4">Joined {{ person.date_joined|date:"F Y" }}</p>
+
+    {% if is_me %}
+      <a class="btn btn-primary" href="{% url 'accounts:edit_profile' %}">Edit profile</a>
+    {% else %}
+      <button class="btn btn-outline-primary" disabled title="Friends arrive in Phase 2">Add friend</button>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

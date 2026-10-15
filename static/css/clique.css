@@ -6,3 +6,20 @@
 .clique-brand {
   color: var(--clique-purple);
 }
+
+/* Round "avatar" with the person's first initial, until profile photos arrive. */
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--clique-purple);
+  color: #fff;
+  font-weight: 600;
+}
+
+.avatar-lg {
+  width: 6rem;
+  height: 6rem;
+  font-size: 2.5rem;
+}
