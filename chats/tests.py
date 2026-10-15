@@ -306,3 +306,116 @@ def test_friend_buttons_include_message(logged_in, jordan):
     response = logged_in.get(reverse("accounts:profile", args=["jordan"]))
 
     assert reverse("chats:start", args=["jordan"]) in response.content.decode()
+
+
+# --- Sending, editing and deleting ---------------------------------------
+
+
+def test_send_message_from_chat_page(logged_in, chat, francis):
+    url = reverse("chats:send", args=[chat.pk])
+
+    response = logged_in.post(url, {"body": "Hey!"})
+
+    assert response.url == reverse("chats:detail", args=[chat.pk]) + "#send"
+    message = chat.messages.get()
+    assert message.sender == francis
+    assert message.body == "Hey!"
+
+
+def test_sending_empty_message_shows_error(logged_in, chat):
+    url = reverse("chats:send", args=[chat.pk])
+
+    response = logged_in.post(url, {"body": "   "}, follow=True)
+
+    assert "You can&#x27;t send an empty message." in response.content.decode()
+    assert not chat.messages.exists()
+
+
+def test_outsiders_cannot_send(client, chat):
+    outsider = User.objects.create_user(username="outsider", password="pass")
+    client.force_login(outsider)
+
+    response = client.post(
+        reverse("chats:send", args=[chat.pk]),
+        {"body": "Hi"},
+    )
+
+    assert response.status_code == 404
+    assert not chat.messages.exists()
+
+
+def test_edit_page_shows_current_text(logged_in, chat, francis):
+    message = send_message(francis, chat, "Helo")
+
+    response = logged_in.get(reverse("chats:edit", args=[message.pk]))
+
+    assert "Helo" in response.content.decode()
+
+
+def test_edit_message_from_chat_page(logged_in, chat, francis):
+    message = send_message(francis, chat, "Helo")
+
+    logged_in.post(
+        reverse("chats:edit", args=[message.pk]),
+        {"body": "Hello"},
+    )
+
+    message.refresh_from_db()
+    assert message.body == "Hello"
+    assert message.edited_at is not None
+
+
+def test_cannot_edit_someone_elses_message_from_page(logged_in, chat, jordan):
+    message = send_message(jordan, chat, "Mine")
+
+    logged_in.post(
+        reverse("chats:edit", args=[message.pk]),
+        {"body": "Changed"},
+    )
+
+    message.refresh_from_db()
+    assert message.body == "Mine"
+
+
+def test_delete_message_from_chat_page(logged_in, chat, francis):
+    message = send_message(francis, chat, "Oops")
+
+    logged_in.post(reverse("chats:delete", args=[message.pk]))
+
+    message.refresh_from_db()
+    assert message.is_deleted
+
+
+def test_outsiders_get_404_for_messages(client, chat, francis):
+    message = send_message(francis, chat, "Private")
+    outsider = User.objects.create_user(username="outsider", password="pass")
+    client.force_login(outsider)
+
+    response = client.post(reverse("chats:delete", args=[message.pk]))
+
+    assert response.status_code == 404
+
+
+def test_chat_page_shows_latest_page_of_messages(logged_in, chat, francis):
+    for number in range(55):
+        send_message(francis, chat, f"Message {number}")
+
+    response = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    shown = [message.body for message in response.context["chat_messages"]]
+    assert len(shown) == 50
+    assert shown[-1] == "Message 54"
+    assert response.context["has_older"]
+
+
+def test_load_older_messages(logged_in, chat, francis):
+    for number in range(55):
+        send_message(francis, chat, f"Message {number}")
+    oldest_shown = chat.messages.order_by("-pk")[49]
+    url = reverse("chats:detail", args=[chat.pk])
+
+    response = logged_in.get(url, {"before": oldest_shown.pk})
+
+    shown = [message.body for message in response.context["chat_messages"]]
+    assert shown == [f"Message {number}" for number in range(5)]
+    assert not response.context["has_older"]
