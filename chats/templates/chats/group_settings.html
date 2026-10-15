@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ chat.name }} settings · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 36rem;">
+  <a href="{% url 'chats:detail' chat.pk %}" class="btn btn-link btn-sm px-0 mb-2">&larr; Back to chat</a>
+  <h1 class="h4 mb-4">{{ chat.name }}</h1>
+
+  {% if is_admin %}
+    <h2 class="h6">Group name</h2>
+    <form method="post" action="{% url 'chats:rename' chat.pk %}" class="d-flex gap-2 mb-4">
+      {% csrf_token %}
+      <input type="text" name="name" value="{{ chat.name }}" maxlength="60" class="form-control" required>
+      <button type="submit" class="btn btn-outline-primary">Rename</button>
+    </form>
+  {% endif %}
+
+  <h2 class="h6">Members ({{ memberships|length }})</h2>
+  <ul class="list-group mb-4">
+    {% for membership in memberships %}
+      {% with person=membership.user %}
+        <li class="list-group-item d-flex align-items-center gap-2">
+          <a href="{% url 'accounts:profile' person.username %}" class="me-auto">{{ person.name }}</a>
+          {% if membership.role == "admin" %}
+            <span class="badge text-bg-secondary">Admin</span>
+          {% elif is_admin %}
+            <form method="post" action="{% url 'chats:make_admin' chat.pk person.username %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-secondary btn-sm">Make admin</button>
+            </form>
+          {% endif %}
+          {% if is_admin and person != user %}
+            <form method="post" action="{% url 'chats:remove_member' chat.pk person.username %}" class="d-inline"
+                  onsubmit="return confirm('Remove {{ person.name|escapejs }} from the group?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm">Remove</button>
+            </form>
+          {% endif %}
+        </li>
+      {% endwith %}
+    {% endfor %}
+  </ul>
+
+  {% if is_admin %}
+    <h2 class="h6">Add friends</h2>
+    {% if add_form.fields.members.queryset %}
+      <form method="post" action="{% url 'chats:add_members' chat.pk %}" class="mb-4">
+        {% csrf_token %}
+        <div class="mb-3">
+          {% include "chats/_friend_checkboxes.html" with field=add_form.members %}
+        </div>
+        <button type="submit" class="btn btn-outline-primary btn-sm">Add to group</button>
+      </form>
+    {% else %}
+      <p class="text-body-secondary small mb-4">All your friends are already in this group.</p>
+    {% endif %}
+  {% endif %}
+
+  <form method="post" action="{% url 'chats:leave' chat.pk %}"
+        onsubmit="return confirm('Leave this group?');">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Leave group</button>
+  </form>
+</div>
+{% endblock %}

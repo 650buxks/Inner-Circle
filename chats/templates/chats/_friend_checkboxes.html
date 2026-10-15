@@ -1,0 +1,9 @@
+{% for checkbox in field %}
+  <div class="form-check">
+    {{ checkbox.tag }}
+    <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+  </div>
+{% endfor %}
+{% for error in field.errors %}
+  <div class="text-danger small mt-1">{{ error }}</div>
+{% endfor %}

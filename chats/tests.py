@@ -8,12 +8,18 @@ from friends.services import block_user
 from .models import Conversation, Membership, Message
 from .services import (
     ChatError,
+    add_members,
     chat_title,
     create_group,
     delete_message,
     edit_message,
     get_or_create_private_chat,
+    is_admin,
+    leave_group,
+    make_admin,
     mark_read,
+    remove_member,
+    rename_group,
     send_message,
     unread_count,
 )
@@ -419,3 +425,168 @@ def test_load_older_messages(logged_in, chat, francis):
     shown = [message.body for message in response.context["chat_messages"]]
     assert shown == [f"Message {number}" for number in range(5)]
     assert not response.context["has_older"]
+
+
+# --- Group settings (services) -------------------------------------------
+
+
+@pytest.fixture
+def group(francis, jordan):
+    """A group made by Francis (admin) with Jordan in it."""
+    return create_group(francis, "Weekend plans", [jordan])
+
+
+def latest_note(group):
+    return group.messages.last().body
+
+
+def test_admin_can_rename_group(group, francis):
+    rename_group(francis, group, "Road trip")
+
+    group.refresh_from_db()
+    assert group.name == "Road trip"
+    assert latest_note(group) == "francis renamed the group to Road trip"
+
+
+def test_members_cannot_rename_group(group, jordan):
+    with pytest.raises(ChatError, match="admins"):
+        rename_group(jordan, group, "Mine now")
+
+
+def test_admin_can_add_friends(group, francis, sam):
+    add_members(francis, group, [sam])
+
+    assert sam in group.members.all()
+    assert latest_note(group) == "francis added sam"
+
+
+def test_cannot_add_non_friends(group, francis):
+    stranger = User.objects.create_user(username="stranger", password="pass")
+
+    with pytest.raises(ChatError, match="isn't your friend"):
+        add_members(francis, group, [stranger])
+
+
+def test_admin_can_remove_member(group, francis, jordan):
+    remove_member(francis, group, jordan)
+
+    assert jordan not in group.members.all()
+    assert latest_note(group) == "francis removed jordan"
+
+
+def test_members_cannot_remove_people(group, francis, jordan):
+    with pytest.raises(ChatError, match="admins"):
+        remove_member(jordan, group, francis)
+
+
+def test_admin_can_make_another_admin(group, francis, jordan):
+    make_admin(francis, group, jordan)
+
+    assert is_admin(jordan, group)
+
+
+def test_leaving_group(group, jordan):
+    leave_group(jordan, group)
+
+    assert jordan not in group.members.all()
+    assert latest_note(group) == "jordan left the group"
+
+
+def test_last_admin_leaving_hands_over_admin(group, francis, jordan):
+    leave_group(francis, group)
+
+    assert is_admin(jordan, group)
+    assert latest_note(group) == "jordan is now an admin"
+
+
+def test_group_is_deleted_when_everyone_leaves(group, francis, jordan):
+    leave_group(francis, group)
+    leave_group(jordan, group)
+
+    assert not Conversation.objects.filter(pk=group.pk).exists()
+
+
+def test_cannot_leave_private_chat(chat, francis):
+    with pytest.raises(ChatError, match="group"):
+        leave_group(francis, chat)
+
+
+# --- Group pages -----------------------------------------------------------
+
+
+def test_new_group_page_lists_friends(logged_in, jordan):
+    response = logged_in.get(reverse("chats:new_group"))
+
+    assert "jordan" in response.content.decode()
+
+
+def test_new_group_page_without_friends(logged_in):
+    response = logged_in.get(reverse("chats:new_group"))
+
+    assert "You need friends to make a group." in response.content.decode()
+
+
+def test_create_group_from_page(logged_in, francis, jordan, sam):
+    response = logged_in.post(
+        reverse("chats:new_group"),
+        {"name": "Movie night", "members": [jordan.pk, sam.pk]},
+    )
+
+    group = Conversation.objects.get(kind=Conversation.Kind.GROUP)
+    assert response.url == reverse("chats:detail", args=[group.pk])
+    assert group.name == "Movie night"
+    assert set(group.members.all()) == {francis, jordan, sam}
+
+
+def test_create_group_needs_a_friend(logged_in, jordan):
+    response = logged_in.post(
+        reverse("chats:new_group"),
+        {"name": "Movie night"},
+    )
+
+    assert "Pick at least one friend." in response.content.decode()
+    assert not Conversation.objects.exists()
+
+
+def test_settings_page_shows_members(logged_in, group):
+    response = logged_in.get(reverse("chats:group_settings", args=[group.pk]))
+
+    page = response.content.decode()
+    assert "jordan" in page
+    assert "Admin" in page
+
+
+def test_private_chats_have_no_settings_page(logged_in, chat):
+    response = logged_in.get(reverse("chats:group_settings", args=[chat.pk]))
+
+    assert response.status_code == 404
+
+
+def test_add_members_from_page(logged_in, group, sam):
+    logged_in.post(
+        reverse("chats:add_members", args=[group.pk]),
+        {"members": [sam.pk]},
+    )
+
+    assert sam in group.members.all()
+
+
+def test_remove_member_from_page(logged_in, group, jordan):
+    logged_in.post(reverse("chats:remove_member", args=[group.pk, "jordan"]))
+
+    assert jordan not in group.members.all()
+
+
+def test_members_cannot_remove_from_page(client, group, francis, jordan):
+    client.force_login(jordan)
+
+    client.post(reverse("chats:remove_member", args=[group.pk, "francis"]))
+
+    assert francis in group.members.all()
+
+
+def test_leave_group_from_page(logged_in, group, francis):
+    response = logged_in.post(reverse("chats:leave", args=[group.pk]))
+
+    assert response.url == reverse("chats:inbox")
+    assert francis not in group.members.all()

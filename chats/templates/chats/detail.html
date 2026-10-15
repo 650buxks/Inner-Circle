@@ -8,6 +8,9 @@
     <a href="{% url 'chats:inbox' %}" class="btn btn-link btn-sm px-0">&larr; Chats</a>
     <div class="avatar avatar-sm">{{ title|first|upper }}</div>
     <h1 class="h5 mb-0">{{ title }}</h1>
+    {% if chat.kind == "group" %}
+      <a href="{% url 'chats:group_settings' chat.pk %}" class="btn btn-outline-secondary btn-sm ms-auto">Group settings</a>
+    {% endif %}
   </div>
 
   {% if has_older %}

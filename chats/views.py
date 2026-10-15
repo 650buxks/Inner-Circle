@@ -7,15 +7,23 @@ from django.views.decorators.http import require_POST
 
 from accounts.models import User
 
+from .forms import AddMembersForm, GroupForm
 from .models import Conversation, Message
 from .services import (
     ChatError,
+    add_members,
     chat_title,
+    create_group,
     delete_message,
     edit_message,
     get_or_create_private_chat,
+    is_admin,
     is_member,
+    leave_group,
+    make_admin,
     mark_read,
+    remove_member,
+    rename_group,
     send_message,
     unread_count,
 )
@@ -53,6 +61,14 @@ def get_message_for(user, pk):
         pk=pk,
         conversation__memberships__user=user,
     )
+
+
+def get_group_for(user, pk):
+    """Like get_chat_for, but only for group chats."""
+    chat = get_chat_for(user, pk)
+    if chat.kind != Conversation.Kind.GROUP:
+        raise Http404
+    return chat
 
 
 def back_to_chat(chat):
@@ -151,3 +167,106 @@ def delete(request, pk):
     except ChatError as error:
         messages.error(request, str(error))
     return back_to_chat(message.conversation)
+
+
+# --- Group chats ----------------------------------------------------------
+
+
+@login_required
+def new_group(request):
+    form = GroupForm(request.POST or None, user=request.user)
+    if request.method == "POST" and form.is_valid():
+        try:
+            chat = create_group(
+                request.user,
+                form.cleaned_data["name"],
+                form.cleaned_data["members"],
+            )
+        except ChatError as error:
+            form.add_error(None, str(error))
+        else:
+            return redirect("chats:detail", pk=chat.pk)
+    return render(request, "chats/new_group.html", {"form": form})
+
+
+@login_required
+def group_settings(request, pk):
+    chat = get_group_for(request.user, pk)
+    context = {
+        "chat": chat,
+        # "admin" sorts before "member", so admins come first.
+        "memberships": chat.memberships.select_related("user").order_by(
+            "role",
+            "user__username",
+        ),
+        "is_admin": is_admin(request.user, chat),
+        "add_form": AddMembersForm(user=request.user, conversation=chat),
+    }
+    return render(request, "chats/group_settings.html", context)
+
+
+def back_to_settings(chat):
+    return redirect("chats:group_settings", pk=chat.pk)
+
+
+@login_required
+@require_POST
+def rename(request, pk):
+    chat = get_group_for(request.user, pk)
+    try:
+        rename_group(request.user, chat, request.POST.get("name", ""))
+    except ChatError as error:
+        messages.error(request, str(error))
+    return back_to_settings(chat)
+
+
+@login_required
+@require_POST
+def add_people(request, pk):
+    chat = get_group_for(request.user, pk)
+    form = AddMembersForm(
+        request.POST,
+        user=request.user,
+        conversation=chat,
+    )
+    if not form.is_valid():
+        messages.error(request, "Pick at least one friend to add.")
+        return back_to_settings(chat)
+    try:
+        add_members(request.user, chat, form.cleaned_data["members"])
+    except ChatError as error:
+        messages.error(request, str(error))
+    return back_to_settings(chat)
+
+
+@login_required
+@require_POST
+def remove(request, pk, username):
+    chat = get_group_for(request.user, pk)
+    person = get_object_or_404(User, username=username)
+    try:
+        remove_member(request.user, chat, person)
+    except ChatError as error:
+        messages.error(request, str(error))
+    return back_to_settings(chat)
+
+
+@login_required
+@require_POST
+def promote(request, pk, username):
+    chat = get_group_for(request.user, pk)
+    person = get_object_or_404(User, username=username)
+    try:
+        make_admin(request.user, chat, person)
+    except ChatError as error:
+        messages.error(request, str(error))
+    return back_to_settings(chat)
+
+
+@login_required
+@require_POST
+def leave(request, pk):
+    chat = get_group_for(request.user, pk)
+    leave_group(request.user, chat)
+    messages.success(request, "You left the group.")
+    return redirect("chats:inbox")
