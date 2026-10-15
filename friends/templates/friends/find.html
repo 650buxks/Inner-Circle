@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Find people · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 36rem;">
+  <h1 class="h3 mb-3">Find people</h1>
+
+  <form method="get" class="d-flex gap-2 mb-4" role="search">
+    <input type="search" name="q" value="{{ query }}" class="form-control"
+           placeholder="Search by username or name" aria-label="Search" autofocus>
+    <button type="submit" class="btn btn-primary">Search</button>
+  </form>
+
+  {% if query %}
+    {% if results %}
+      <div class="list-group">
+        {% for person in results %}
+          <a href="{% url 'accounts:profile' person.username %}"
+             class="list-group-item list-group-item-action d-flex align-items-center gap-3">
+            <div class="avatar avatar-sm">{{ person.name|first|upper }}</div>
+            <div class="flex-grow-1">
+              <div class="fw-semibold">{{ person.name }}</div>
+              <div class="text-body-secondary small">@{{ person.username }}</div>
+            </div>
+            {% if person.relationship == "friends" %}
+              <span class="badge text-bg-success">Friends</span>
+            {% elif person.relationship == "request_sent" %}
+              <span class="badge text-bg-secondary">Request sent</span>
+            {% elif person.relationship == "request_received" %}
+              <span class="badge text-bg-primary">Wants to be friends</span>
+            {% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-body-secondary">No one found for "{{ query }}".</p>
+    {% endif %}
+  {% else %}
+    <p class="text-body-secondary">Search for friends by their username or display name.</p>
+  {% endif %}
+</div>
+{% endblock %}

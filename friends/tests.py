@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from django.urls import reverse
 
 from .models import FriendRequest
 from .services import (
@@ -118,3 +119,75 @@ def test_unblock(francis, jordan):
     unblock_user(francis, jordan)
 
     assert relationship(francis, jordan) == "none"
+
+
+# --- Find people page ---------------------------------------------------
+
+
+def search(client, query):
+    """Search on the Find people page and return the page's HTML."""
+    response = client.get(reverse("friends:find"), {"q": query})
+    return response.content.decode()
+
+
+@pytest.fixture
+def logged_in(client, francis):
+    client.force_login(francis)
+    return client
+
+
+def test_find_people_requires_login(client):
+    response = client.get(reverse("friends:find"))
+
+    assert response.status_code == 302
+
+
+def test_find_people_page_loads_without_a_search(logged_in):
+    response = logged_in.get(reverse("friends:find"))
+
+    assert response.status_code == 200
+    assert "Search for friends" in response.content.decode()
+
+
+def test_search_by_username_ignores_case(logged_in, jordan):
+    assert "@jordan" in search(logged_in, "JOR")
+
+
+def test_search_by_display_name(logged_in, jordan):
+    jordan.display_name = "Jordan Lee"
+    jordan.save()
+
+    assert "@jordan" in search(logged_in, "lee")
+
+
+def test_search_does_not_show_yourself(logged_in):
+    assert "@francis" not in search(logged_in, "francis")
+
+
+def test_search_shows_no_results_message(logged_in):
+    assert 'No one found for "zzz"' in search(logged_in, "zzz")
+
+
+def test_search_hides_blocked_people(logged_in, francis, jordan):
+    block_user(francis, jordan)
+
+    assert "@jordan" not in search(logged_in, "jordan")
+
+
+def test_search_hides_people_who_blocked_you(logged_in, francis, jordan):
+    block_user(jordan, francis)
+
+    assert "@jordan" not in search(logged_in, "jordan")
+
+
+def test_search_hides_deactivated_accounts(logged_in, jordan):
+    jordan.is_active = False
+    jordan.save()
+
+    assert "@jordan" not in search(logged_in, "jordan")
+
+
+def test_search_shows_relationship(logged_in, francis, jordan):
+    send_friend_request(francis, jordan)
+
+    assert "Request sent" in search(logged_in, "jordan")
