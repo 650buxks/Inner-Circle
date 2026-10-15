@@ -1,5 +1,8 @@
+import re
+
 import pytest
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.urls import reverse
 
 User = get_user_model()
@@ -367,3 +370,79 @@ def test_settings_actions_only_accept_post(logged_in):
     response = logged_in.get(reverse("accounts:delete_account"))
 
     assert response.status_code == 405  # "method not allowed"
+
+
+def request_reset_link(client, email):
+    """Fill in the "forgot password" form and return the reset link sent."""
+    client.post(reverse("accounts:password_reset"), {"email": email})
+    body = mail.outbox[-1].body
+    return re.search(r"https?://\S+", body).group()
+
+
+def test_forgot_password_page_loads(client):
+    response = client.get(reverse("accounts:password_reset"))
+
+    assert response.status_code == 200
+    assert "Forgot your password?" in response.content.decode()
+
+
+def test_login_page_links_to_forgot_password(client):
+    response = client.get(reverse("accounts:login"))
+
+    assert reverse("accounts:password_reset") in response.content.decode()
+
+
+def test_reset_sends_email_with_link(client, francis):
+    response = client.post(
+        reverse("accounts:password_reset"),
+        {"email": "FRANCIS@example.com"},
+    )
+
+    assert response.status_code == 302
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == ["francis@example.com"]
+    assert mail.outbox[0].subject == "Reset your Clique password"
+
+
+def test_reset_for_unknown_email_sends_nothing(client, db):
+    response = client.post(
+        reverse("accounts:password_reset"),
+        {"email": "nobody@example.com"},
+    )
+
+    # Same "check your email" page, so nobody can use this form to find
+    # out which emails have accounts.
+    assert response.status_code == 302
+    assert response.url == reverse("accounts:password_reset_done")
+    assert len(mail.outbox) == 0
+
+
+def test_reset_link_sets_new_password(client, francis):
+    link = request_reset_link(client, "francis@example.com")
+
+    # Opening the link redirects to a page that holds the token safely.
+    response = client.get(link, follow=True)
+    form_url = response.redirect_chain[-1][0]
+    response = client.post(
+        form_url,
+        {"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD},
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("accounts:password_reset_complete")
+    francis.refresh_from_db()
+    assert francis.check_password(NEW_PASSWORD)
+
+
+def test_reset_link_only_works_once(client, francis):
+    link = request_reset_link(client, "francis@example.com")
+    response = client.get(link, follow=True)
+    form_url = response.redirect_chain[-1][0]
+    client.post(
+        form_url,
+        {"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD},
+    )
+
+    response = client.get(link, follow=True)
+
+    assert "This link doesn't work" in response.content.decode()

@@ -127,6 +127,20 @@ CELERY_RESULT_BACKEND = None
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=not REDIS_URL)
 CELERY_TASK_EAGER_PROPAGATES = True
 
+# --- Email ------------------------------------------------------------------
+
+# While developing, emails are printed in the terminal (`docker compose logs
+# web`) instead of being sent. Production sets a real email service here.
+MAILERS = {
+    "default": {
+        "BACKEND": env(
+            "EMAIL_BACKEND",
+            default="django.core.mail.backends.console.EmailBackend",
+        ),
+    },
+}
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Clique <no-reply@clique.local>")
+
 # --- Language and time ------------------------------------------------------
 
 LANGUAGE_CODE = "en-us"
