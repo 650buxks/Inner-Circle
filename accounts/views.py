@@ -1,8 +1,11 @@
+from django.contrib import messages
 from django.contrib.auth import login
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import LoginForm, SignUpForm
+from .forms import LoginForm, ProfileForm, SignUpForm
+from .models import User
 
 
 def signup(request):
@@ -32,3 +35,28 @@ class CliqueLoginView(LoginView):
             # Log out when the browser closes.
             self.request.session.set_expiry(0)
         return super().form_valid(form)
+
+
+@login_required
+def profile(request, username):
+    person = get_object_or_404(User, username=username)
+    context = {"person": person, "is_me": person == request.user}
+    return render(request, "accounts/profile.html", context)
+
+
+@login_required
+def edit_profile(request):
+    # Edit a fresh copy of the user, so a form with errors can't change the
+    # name shown in the navbar before anything is saved.
+    me = User.objects.get(pk=request.user.pk)
+
+    if request.method == "POST":
+        form = ProfileForm(request.POST, instance=me)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Your profile has been updated.")
+            return redirect("accounts:profile", username=me.username)
+    else:
+        form = ProfileForm(instance=me)
+
+    return render(request, "accounts/edit_profile.html", {"form": form})

@@ -153,3 +153,87 @@ def test_logout(client, francis):
 
     assert response.status_code == 302
     assert logged_in_user_id(client) is None
+
+
+def test_profile_requires_login(client, francis):
+    url = reverse("accounts:profile", args=["francis"])
+
+    response = client.get(url)
+
+    assert response.status_code == 302
+    assert response.url.startswith(reverse("accounts:login"))
+
+
+def test_profile_shows_person_details(client, francis):
+    francis.display_name = "Francis Isip"
+    francis.status_message = "At the cafe"
+    francis.bio = "From the Bay Area."
+    francis.save()
+    client.force_login(francis)
+
+    response = client.get(reverse("accounts:profile", args=["francis"]))
+
+    page = response.content.decode()
+    assert "Francis Isip" in page
+    assert "@francis" in page
+    assert "At the cafe" in page
+    assert "From the Bay Area." in page
+    assert "Edit profile" in page  # it's your own profile
+
+
+def test_other_persons_profile_has_no_edit_button(client, francis):
+    User.objects.create_user(username="jordan", password=SIGNUP_PASSWORD)
+    client.force_login(francis)
+
+    response = client.get(reverse("accounts:profile", args=["jordan"]))
+
+    assert response.status_code == 200
+    assert "Edit profile" not in response.content.decode()
+
+
+def test_profile_of_unknown_user_is_404(client, francis):
+    client.force_login(francis)
+
+    response = client.get(reverse("accounts:profile", args=["nobody"]))
+
+    assert response.status_code == 404
+
+
+def test_edit_profile_saves_changes(client, francis):
+    client.force_login(francis)
+
+    response = client.post(
+        reverse("accounts:edit_profile"),
+        {
+            "display_name": "Francis Isip",
+            "username": "francis",
+            "status_message": "Coding Clique",
+            "bio": "Hi!",
+        },
+    )
+
+    assert response.status_code == 302
+    francis.refresh_from_db()
+    assert francis.display_name == "Francis Isip"
+    assert francis.status_message == "Coding Clique"
+    assert francis.bio == "Hi!"
+
+
+def test_edit_profile_rejects_taken_username(client, francis):
+    User.objects.create_user(username="jordan", password=SIGNUP_PASSWORD)
+    client.force_login(francis)
+
+    response = client.post(
+        reverse("accounts:edit_profile"),
+        {
+            "display_name": "",
+            "username": "jordan",
+            "status_message": "",
+            "bio": "",
+        },
+    )
+
+    assert response.status_code == 200  # form shown again with an error
+    assert "already exists" in response.content.decode()
+    francis.refresh_from_db()
+    assert francis.username == "francis"

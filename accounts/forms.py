@@ -40,3 +40,20 @@ class LoginForm(AuthenticationForm):
         self.fields["username"].widget.attrs["class"] = "form-control"
         self.fields["password"].widget.attrs["class"] = "form-control"
         self.fields["remember_me"].widget.attrs["class"] = "form-check-input"
+
+
+class ProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ("display_name", "username", "status_message", "bio")
+        widgets = {
+            "bio": forms.Textarea(attrs={"rows": 4}),
+        }
+        help_texts = {
+            "username": "Letters, numbers and @ . + - _ only.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "form-control"
