@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}New group · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 36rem;">
+  <h1 class="h4 mb-4">New group</h1>
+
+  {% if form.fields.members.queryset %}
+    <form method="post">
+      {% csrf_token %}
+      {% for error in form.non_field_errors %}
+        <div class="alert alert-danger">{{ error }}</div>
+      {% endfor %}
+
+      {% include "accounts/_field.html" with field=form.name %}
+
+      <p class="form-label mb-2">Friends to add</p>
+      <div class="mb-4">
+        {% include "chats/_friend_checkboxes.html" with field=form.members %}
+      </div>
+
+      <button type="submit" class="btn btn-primary">Create group</button>
+      <a href="{% url 'chats:inbox' %}" class="btn btn-link">Cancel</a>
+    </form>
+  {% else %}
+    <p class="text-body-secondary">
+      You need friends to make a group.
+      <a href="{% url 'friends:find' %}">Find people</a>
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -97,6 +97,89 @@ def create_group(creator, name, members):
     return conversation
 
 
+def is_admin(user, conversation):
+    return conversation.memberships.filter(
+        user=user,
+        role=Membership.Role.ADMIN,
+    ).exists()
+
+
+def _check_admin(user, conversation):
+    if conversation.kind != Conversation.Kind.GROUP:
+        raise ChatError("Only group chats have settings.")
+    if not is_admin(user, conversation):
+        raise ChatError("Only group admins can do that.")
+
+
+@transaction.atomic
+def rename_group(user, conversation, name):
+    _check_admin(user, conversation)
+    name = name.strip()
+    if not name:
+        raise ChatError("Give your group a name.")
+    if name == conversation.name:
+        return
+    conversation.name = name
+    conversation.save(update_fields=["name"])
+    text = f"{user.name} renamed the group to {name}"
+    add_system_message(conversation, text)
+
+
+@transaction.atomic
+def add_members(user, conversation, people):
+    _check_admin(user, conversation)
+    for person in people:
+        if is_member(person, conversation):
+            continue
+        if not are_friends(user, person):
+            raise ChatError(f"{person.name} isn't your friend.")
+        Membership.objects.create(conversation=conversation, user=person)
+        add_system_message(conversation, f"{user.name} added {person.name}")
+
+
+@transaction.atomic
+def remove_member(user, conversation, person):
+    _check_admin(user, conversation)
+    if person == user:
+        raise ChatError("To leave the group, use Leave group.")
+    deleted, _ = conversation.memberships.filter(user=person).delete()
+    if not deleted:
+        raise ChatError(f"{person.name} isn't in this group.")
+    add_system_message(conversation, f"{user.name} removed {person.name}")
+
+
+def make_admin(user, conversation, person):
+    _check_admin(user, conversation)
+    updated = conversation.memberships.filter(user=person).update(
+        role=Membership.Role.ADMIN,
+    )
+    if not updated:
+        raise ChatError(f"{person.name} isn't in this group.")
+
+
+@transaction.atomic
+def leave_group(user, conversation):
+    if conversation.kind != Conversation.Kind.GROUP:
+        raise ChatError("You can only leave group chats.")
+    deleted, _ = conversation.memberships.filter(user=user).delete()
+    if not deleted:
+        raise ChatError("You're not in this group.")
+
+    remaining = conversation.memberships.order_by("joined_at", "pk")
+    if not remaining.exists():
+        # Nobody left, so the group (and its messages) can go.
+        conversation.delete()
+        return
+    add_system_message(conversation, f"{user.name} left the group")
+    # A group always needs an admin: hand it to the longest-standing member.
+    if not remaining.filter(role=Membership.Role.ADMIN).exists():
+        oldest = remaining.first()
+        oldest.role = Membership.Role.ADMIN
+        oldest.save(update_fields=["role"])
+        text = f"{oldest.user.name} is now an admin"
+        add_system_message(conversation, text)
+
+
 def add_system_message(conversation, text):
     return _save_message(
         conversation,

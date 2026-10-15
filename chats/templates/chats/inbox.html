@@ -4,7 +4,10 @@
 
 {% block content %}
 <div class="mx-auto" style="max-width: 36rem;">
-  <h1 class="h3 mb-4">Chats</h1>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Chats</h1>
+    <a href="{% url 'chats:new_group' %}" class="btn btn-outline-primary btn-sm">New group</a>
+  </div>
 
   {% if chats %}
     <div class="list-group">
