@@ -374,3 +374,88 @@ def test_friends_see_the_full_profile(logged_in, francis, jordan):
     response = logged_in.get(reverse("accounts:profile", args=["jordan"]))
 
     assert "Secret bio" in response.content.decode()
+
+
+# --- Blocking and privacy -----------------------------------------------
+
+
+def only_friends_of_friends(user):
+    user.friend_requests_from = User.RequestsFrom.FRIENDS_OF_FRIENDS
+    user.save()
+
+
+def test_friends_of_friends_setting_blocks_strangers(francis, jordan):
+    only_friends_of_friends(jordan)
+
+    with pytest.raises(FriendshipError, match="friends of friends"):
+        send_friend_request(francis, jordan)
+
+
+def test_friends_of_friends_setting_allows_mutual_friends(francis, jordan):
+    sam = User.objects.create_user(username="sam", password="pass")
+    francis.friends.add(sam)
+    jordan.friends.add(sam)
+    only_friends_of_friends(jordan)
+
+    send_friend_request(francis, jordan)
+
+    assert relationship(francis, jordan) == "request_sent"
+
+
+def test_profile_explains_friends_of_friends_setting(logged_in, jordan):
+    only_friends_of_friends(jordan)
+
+    response = logged_in.get(reverse("accounts:profile", args=["jordan"]))
+
+    page = response.content.decode()
+    assert "Only accepts requests from friends of friends" in page
+    assert "Add friend" not in page
+
+
+def test_privacy_setting_can_be_changed(logged_in, francis):
+    logged_in.post(
+        reverse("accounts:privacy"),
+        {"friend_requests_from": "friends_of_friends"},
+    )
+
+    francis.refresh_from_db()
+    assert francis.friend_requests_from == "friends_of_friends"
+
+
+def test_block_button(logged_in, francis, jordan):
+    response = press(logged_in, "block", "jordan")
+
+    assert response.status_code == 302
+    assert relationship(francis, jordan) == "blocked"
+
+
+def test_unblock_button(logged_in, francis, jordan):
+    block_user(francis, jordan)
+
+    press(logged_in, "unblock", "jordan")
+
+    assert relationship(francis, jordan) == "none"
+
+
+def test_blocked_profile_shows_unblock(logged_in, francis, jordan):
+    block_user(francis, jordan)
+
+    response = logged_in.get(reverse("accounts:profile", args=["jordan"]))
+
+    assert "Unblock" in response.content.decode()
+
+
+def test_profile_hidden_from_people_they_blocked(logged_in, francis, jordan):
+    block_user(jordan, francis)
+
+    response = logged_in.get(reverse("accounts:profile", args=["jordan"]))
+
+    assert response.status_code == 404
+
+
+def test_settings_lists_blocked_people(logged_in, francis, jordan):
+    block_user(francis, jordan)
+
+    response = logged_in.get(reverse("accounts:settings"))
+
+    assert "@jordan" in response.content.decode()

@@ -40,6 +40,15 @@
       <a class="btn btn-primary" href="{% url 'accounts:edit_profile' %}">Edit profile</a>
     {% else %}
       {% include "friends/_buttons.html" %}
+
+      {% if relationship != "blocked" %}
+        <form method="post" action="{% url 'friends:block' person.username %}" class="mt-4"
+              onsubmit="return confirm('Block {{ person.name|escapejs }}? They will no longer be able to find you or send you requests.');">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="btn btn-link btn-sm text-danger">Block {{ person.name }}</button>
+        </form>
+      {% endif %}
     {% endif %}
   </div>
 </div>

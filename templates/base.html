@@ -14,6 +14,7 @@
       {% if user.is_authenticated %}
         <div class="d-flex align-items-center gap-3">
           <a class="navbar-text text-decoration-none" href="{% url 'accounts:profile' user.username %}">Hi, {{ user.name }}</a>
+          <a class="btn btn-link btn-sm" href="{% url 'friends:list' %}">Friends</a>
           <a class="btn btn-link btn-sm" href="{% url 'friends:find' %}">Find people</a>
           <a class="btn btn-link btn-sm" href="{% url 'friends:requests' %}">
             Requests

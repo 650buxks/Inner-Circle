@@ -11,11 +11,13 @@ from .models import FriendRequest
 from .services import (
     FriendshipError,
     accept_friend_request,
+    block_user,
     cancel_friend_request,
     decline_friend_request,
     relationship,
     remove_friend,
     send_friend_request,
+    unblock_user,
 )
 
 MAX_RESULTS = 20
@@ -142,4 +144,26 @@ def unfriend(request, username):
     person = get_object_or_404(User, username=username)
     remove_friend(request.user, person)
     messages.info(request, f"You and {person.name} are no longer friends.")
+    return redirect_back(request)
+
+
+@login_required
+@require_POST
+def block(request, username):
+    person = get_object_or_404(User, username=username)
+    try:
+        block_user(request.user, person)
+    except FriendshipError as error:
+        messages.error(request, str(error))
+    else:
+        messages.info(request, f"You blocked {person.name}.")
+    return redirect_back(request)
+
+
+@login_required
+@require_POST
+def unblock(request, username):
+    person = get_object_or_404(User, username=username)
+    unblock_user(request.user, person)
+    messages.info(request, f"You unblocked {person.name}.")
     return redirect_back(request)

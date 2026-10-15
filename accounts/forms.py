@@ -73,6 +73,8 @@ class StyledFormMixin:
         for field in self.fields.values():
             if isinstance(field.widget, forms.CheckboxInput):
                 field.widget.attrs["class"] = "form-check-input"
+            elif isinstance(field.widget, forms.Select):
+                field.widget.attrs["class"] = "form-select"
             else:
                 field.widget.attrs["class"] = "form-control"
 
@@ -122,6 +124,13 @@ class AISettingsForm(StyledFormMixin, forms.ModelForm):
             "ai_opt_out": "Clique AI won't read your messages when friends "
             "ask it to catch them up.",
         }
+
+
+class PrivacyForm(StyledFormMixin, forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ("friend_requests_from",)
+        labels = {"friend_requests_from": "Who can send you friend requests"}
 
 
 class DeleteAccountForm(PasswordCheckMixin, StyledFormMixin, forms.Form):
