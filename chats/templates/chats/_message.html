@@ -1,0 +1,26 @@
+{% if message.kind == "system" %}
+  <p id="message-{{ message.pk }}" class="text-center text-body-secondary small my-3">{{ message.body }}</p>
+{% else %}
+  <div id="message-{{ message.pk }}" class="mb-3 {% if message.sender == user %}text-end{% endif %}">
+    <div class="small text-body-secondary">
+      {{ message.sender_name }} · {{ message.created_at|time:"g:i A" }}
+      {% if message.edited_at and not message.is_deleted %}· edited{% endif %}
+    </div>
+    {% if message.is_deleted %}
+      <div class="d-inline-block px-3 py-2 rounded-3 border fst-italic text-body-secondary">Message deleted</div>
+    {% else %}
+      <div class="d-inline-block px-3 py-2 rounded-3 text-start {% if message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
+      {% if message.sender == user and message.kind == "text" %}
+        <div class="small">
+          <a href="{% url 'chats:edit' message.pk %}" class="link-secondary">Edit</a>
+          <form method="post" action="{% url 'chats:delete' message.pk %}" class="d-inline"
+                onsubmit="return confirm('Delete this message?');">
+            {# Filled in by chat.js when this arrives over the WebSocket. #}
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn-link btn-sm link-danger p-0 align-baseline">Delete</button>
+          </form>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endif %}
