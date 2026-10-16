@@ -109,6 +109,7 @@ def chat_detail(request, pk):
         "chat_messages": chat_messages,
         "has_older": has_older,
         "max_length": Message.MAX_LENGTH,
+        "live": not before,
     }
     return render(request, "chats/detail.html", context)
 

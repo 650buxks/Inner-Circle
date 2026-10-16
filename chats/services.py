@@ -10,6 +10,7 @@ from django.utils import timezone
 from friends.services import are_friends, is_blocked_between
 
 from .models import Conversation, Membership, Message
+from .realtime import broadcast
 
 
 class ChatError(Exception):
@@ -218,6 +219,7 @@ def _save_message(conversation, sender, body, kind=Message.Kind.TEXT):
     )
     conversation.last_activity_at = message.created_at
     conversation.save(update_fields=["last_activity_at"])
+    broadcast(message, "message.new")
     return message
 
 
@@ -232,6 +234,7 @@ def edit_message(user, message, new_body):
     message.body = new_body
     message.edited_at = timezone.now()
     message.save(update_fields=["body", "edited_at"])
+    broadcast(message, "message.changed")
     return message
 
 
@@ -242,6 +245,7 @@ def delete_message(user, message):
     message.is_deleted = True
     message.body = ""
     message.save(update_fields=["is_deleted", "body"])
+    broadcast(message, "message.changed")
 
 
 def mark_read(user, conversation):

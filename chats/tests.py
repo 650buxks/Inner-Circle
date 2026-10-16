@@ -1,11 +1,18 @@
 import pytest
+from asgiref.sync import async_to_sync
+from channels.db import database_sync_to_async
+from channels.layers import channel_layers
+from channels.routing import URLRouter
+from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError
 from django.urls import reverse
 
 from friends.services import block_user
 
 from .models import Conversation, Membership, Message
+from .routing import websocket_urlpatterns
 from .services import (
     ChatError,
     add_members,
@@ -590,3 +597,174 @@ def test_leave_group_from_page(logged_in, group, francis):
 
     assert response.url == reverse("chats:inbox")
     assert francis not in group.members.all()
+
+
+# --- Live updates (WebSockets) ---------------------------------------------
+#
+# These tests use transaction=True because live updates are only sent once
+# a message is really committed to the database (transaction.on_commit).
+
+
+@pytest.fixture
+def channel_layer(settings):
+    """Use the in-memory channel layer instead of Redis while testing."""
+    settings.CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+    }
+    channel_layers.backends.clear()  # forget any layer made with Redis
+    yield
+    channel_layers.backends.clear()
+
+
+def socket_for(user, chat):
+    """A pretend browser tab with `chat` open, logged in as `user`."""
+    application = URLRouter(websocket_urlpatterns)
+    communicator = WebsocketCommunicator(application, f"/ws/chats/{chat.pk}/")
+    communicator.scope["user"] = user
+    return communicator
+
+
+live = pytest.mark.django_db(transaction=True)
+
+
+@live
+def test_members_can_connect(channel_layer, chat, francis):
+    async def scenario():
+        socket = socket_for(francis, chat)
+        connected, _ = await socket.connect()
+        await socket.disconnect()
+        return connected
+
+    assert async_to_sync(scenario)()
+
+
+@live
+def test_outsiders_cannot_connect(channel_layer, chat):
+    outsider = User.objects.create_user(username="outsider", password="pass")
+
+    async def scenario():
+        connected, _ = await socket_for(outsider, chat).connect()
+        return connected
+
+    assert not async_to_sync(scenario)()
+
+
+@live
+def test_logged_out_people_cannot_connect(channel_layer, chat):
+    async def scenario():
+        connected, _ = await socket_for(AnonymousUser(), chat).connect()
+        return connected
+
+    assert not async_to_sync(scenario)()
+
+
+@live
+def test_socket_message_reaches_everyone(channel_layer, chat, francis, jordan):
+    async def scenario():
+        mine, theirs = socket_for(francis, chat), socket_for(jordan, chat)
+        await mine.connect()
+        await theirs.connect()
+
+        await mine.send_json_to({"type": "message", "body": "On my way!"})
+        received = (
+            await mine.receive_json_from(),
+            await theirs.receive_json_from(),
+        )
+
+        await mine.disconnect()
+        await theirs.disconnect()
+        return received
+
+    for_me, for_them = async_to_sync(scenario)()
+
+    assert chat.messages.get().body == "On my way!"
+    assert for_me["type"] == for_them["type"] == "message.new"
+    assert "On my way!" in for_them["html"]
+    # Only the sender gets Edit and Delete links.
+    assert "Edit" in for_me["html"]
+    assert "Edit" not in for_them["html"]
+
+
+@live
+def test_empty_message_over_socket_gets_an_error(channel_layer, chat, francis):
+    async def scenario():
+        socket = socket_for(francis, chat)
+        await socket.connect()
+        await socket.send_json_to({"type": "message", "body": "   "})
+        reply = await socket.receive_json_from()
+        await socket.disconnect()
+        return reply
+
+    reply = async_to_sync(scenario)()
+
+    assert reply == {
+        "type": "error",
+        "message": "You can't send an empty message.",
+    }
+    assert not chat.messages.exists()
+
+
+@live
+def test_form_messages_appear_live(channel_layer, chat, francis, jordan):
+    async def scenario():
+        socket = socket_for(jordan, chat)
+        await socket.connect()
+        await database_sync_to_async(send_message)(francis, chat, "Hi!")
+        received = await socket.receive_json_from()
+        await socket.disconnect()
+        return received
+
+    received = async_to_sync(scenario)()
+
+    assert received["type"] == "message.new"
+    assert "Hi!" in received["html"]
+
+
+@live
+def test_live_message_is_marked_read(channel_layer, chat, francis, jordan):
+    async def scenario():
+        socket = socket_for(jordan, chat)
+        await socket.connect()
+        await database_sync_to_async(send_message)(francis, chat, "Hi!")
+        await socket.receive_json_from()
+        await socket.disconnect()
+
+    async_to_sync(scenario)()
+
+    assert unread_count(jordan, chat) == 0
+
+
+@live
+def test_edits_and_deletes_appear_live(channel_layer, chat, francis, jordan):
+    message = send_message(francis, chat, "Helo")
+
+    async def scenario():
+        socket = socket_for(jordan, chat)
+        await socket.connect()
+        await database_sync_to_async(edit_message)(francis, message, "Hello")
+        edited = await socket.receive_json_from()
+        await database_sync_to_async(delete_message)(francis, message)
+        deleted = await socket.receive_json_from()
+        await socket.disconnect()
+        return edited, deleted
+
+    edited, deleted = async_to_sync(scenario)()
+
+    assert edited["type"] == "message.changed"
+    assert edited["id"] == message.pk
+    assert "Hello" in edited["html"]
+    assert "Message deleted" in deleted["html"]
+
+
+def test_chat_page_connects_live(logged_in, chat):
+    response = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    assert f"/ws/chats/{chat.pk}/" in response.content.decode()
+
+
+def test_older_messages_page_is_not_live(logged_in, chat):
+    url = reverse("chats:detail", args=[chat.pk])
+
+    response = logged_in.get(url, {"before": 1})
+
+    assert "/ws/chats/" not in response.content.decode()
