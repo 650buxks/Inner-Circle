@@ -22,6 +22,7 @@ from .services import (
     leave_group,
     make_admin,
     mark_read,
+    presence_text,
     read_receipt,
     remove_member,
     rename_group,
@@ -112,6 +113,7 @@ def chat_detail(request, pk):
         "max_length": Message.MAX_LENGTH,
         "live": not before,
         "receipt": read_receipt(chat, request.user),
+        "presence": presence_text(chat, request.user),
     }
     return render(request, "chats/detail.html", context)
 

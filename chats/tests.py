@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import pytest
 from asgiref.sync import async_to_sync
 from channels.db import database_sync_to_async
@@ -8,7 +10,9 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError
 from django.urls import reverse
+from django.utils import timezone
 
+from accounts import presence
 from friends.services import block_user
 
 from .models import Conversation, Membership, Message
@@ -25,6 +29,7 @@ from .services import (
     leave_group,
     make_admin,
     mark_read,
+    presence_text,
     read_receipt,
     remove_member,
     rename_group,
@@ -628,6 +633,14 @@ def socket_for(user, chat):
 live = pytest.mark.django_db(transaction=True)
 
 
+async def receive(socket, kind):
+    """The next event of this kind, skipping others (like presence)."""
+    while True:
+        event = await socket.receive_json_from()
+        if event["type"] == kind:
+            return event
+
+
 @live
 def test_members_can_connect(channel_layer, chat, francis):
     async def scenario():
@@ -668,8 +681,8 @@ def test_socket_message_reaches_everyone(channel_layer, chat, francis, jordan):
 
         await mine.send_json_to({"type": "message", "body": "On my way!"})
         received = (
-            await mine.receive_json_from(),
-            await theirs.receive_json_from(),
+            await receive(mine, "message.new"),
+            await receive(theirs, "message.new"),
         )
 
         await mine.disconnect()
@@ -817,9 +830,10 @@ def test_typing_is_shown_to_others_only(channel_layer, chat, francis, jordan):
         mine, theirs = socket_for(francis, chat), socket_for(jordan, chat)
         await mine.connect()
         await theirs.connect()
+        await receive(mine, "presence")  # Jordan came online
 
         await mine.send_json_to({"type": "typing"})
-        for_them = await theirs.receive_json_from()
+        for_them = await receive(theirs, "typing")
         nothing_for_me = await mine.receive_nothing()
 
         await mine.disconnect()
@@ -845,3 +859,89 @@ def test_sender_sees_receipt_live(channel_layer, chat, francis, jordan):
         return received
 
     assert async_to_sync(scenario)() == {"type": "receipt", "text": "Seen"}
+
+
+# --- Online status -------------------------------------------------------
+
+
+def test_nobody_is_online_by_default(francis):
+    assert not francis.is_online
+    assert francis.presence == ""
+
+
+def test_open_connection_means_online(francis):
+    presence.connected(francis)
+    francis.refresh_from_db()
+
+    assert francis.is_online
+    assert francis.presence == "Online"
+
+
+def test_closing_last_tab_means_offline(francis):
+    presence.connected(francis)
+    presence.disconnected(francis)
+    francis.refresh_from_db()
+
+    assert not francis.is_online
+    assert francis.presence == "Last seen just now"
+
+
+def test_one_of_two_tabs_closing_keeps_you_online(francis):
+    presence.connected(francis)
+    presence.connected(francis)
+    presence.disconnected(francis)
+    francis.refresh_from_db()
+
+    assert francis.is_online
+
+
+def test_silent_tab_stops_counting_as_online(francis):
+    presence.connected(francis)
+    # The tab never said goodbye and hasn't checked in for 2 hours.
+    two_hours_ago = timezone.now() - timedelta(hours=2)
+    User.objects.filter(pk=francis.pk).update(last_seen=two_hours_ago)
+    francis.refresh_from_db()
+
+    assert not francis.is_online
+    assert francis.presence == "Last seen 2 hours ago"
+
+
+def test_private_chat_shows_other_persons_status(chat, francis, jordan):
+    presence.connected(jordan)
+
+    assert presence_text(chat, francis) == "Online"
+
+
+def test_group_shows_how_many_are_online(francis, jordan, sam):
+    group = create_group(francis, "Weekend plans", [jordan, sam])
+    presence.connected(jordan)
+
+    assert presence_text(group, francis) == "1 online"
+
+
+def test_friends_list_shows_green_dot(logged_in, jordan):
+    presence.connected(jordan)
+
+    response = logged_in.get(reverse("friends:list"))
+
+    assert "online-dot" in response.content.decode()
+
+
+@live
+def test_status_updates_live(channel_layer, chat, francis, jordan):
+    async def scenario():
+        mine, theirs = socket_for(francis, chat), socket_for(jordan, chat)
+        await mine.connect()
+
+        await theirs.connect()
+        came_online = await receive(mine, "presence")
+        await theirs.disconnect()
+        went_offline = await receive(mine, "presence")
+
+        await mine.disconnect()
+        return came_online, went_offline
+
+    came_online, went_offline = async_to_sync(scenario)()
+
+    assert came_online["text"] == "Online"
+    assert went_offline["text"] == "Last seen just now"

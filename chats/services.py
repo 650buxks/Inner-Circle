@@ -37,6 +37,20 @@ def chat_title(conversation, user):
     return person.name if person else "Deleted user"
 
 
+def presence_text(conversation, user):
+    """The status line under the chat's name, as `user` sees it.
+
+    Private chats: "Online" or "Last seen 5 minutes ago".
+    Groups: how many of the others are online, e.g. "2 online".
+    """
+    if conversation.kind == Conversation.Kind.PRIVATE:
+        person = other_person(conversation, user)
+        return person.presence if person else ""
+    others = conversation.members.exclude(pk=user.pk)
+    online = sum(1 for person in others if person.is_online)
+    return f"{online} online" if online else ""
+
+
 def private_key(user, other):
     low, high = sorted([user.pk, other.pk])
     return f"{low}:{high}"

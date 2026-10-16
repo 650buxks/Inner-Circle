@@ -30,3 +30,14 @@
   height: 2.5rem;
   font-size: 1.1rem;
 }
+
+
+/* Small green dot next to people who are online. */
+.online-dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-left: 0.25rem;
+  border-radius: 50%;
+  background: var(--bs-success);
+}
