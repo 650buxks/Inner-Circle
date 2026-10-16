@@ -14,6 +14,7 @@
             <div class="avatar avatar-sm">{{ person.name|first|upper }}</div>
             <div class="flex-grow-1">
               <a class="fw-semibold text-decoration-none" href="{% url 'accounts:profile' person.username %}">{{ person.name }}</a>
+              {% if person.is_online %}<span class="online-dot" title="Online"></span>{% endif %}
               <div class="text-body-secondary small">
                 @{{ person.username }}{% if person.status_message %} · {{ person.status_message }}{% endif %}
               </div>

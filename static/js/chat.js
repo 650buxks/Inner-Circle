@@ -11,6 +11,7 @@ if (socketUrl) {
   const errorBox = document.getElementById("chat-error");
   const receipt = document.getElementById("read-receipt");
   const typing = document.getElementById("typing");
+  const presence = document.getElementById("presence");
   const csrfToken = form.querySelector("[name=csrfmiddlewaretoken]").value;
   let socket = null;
   let typingTimer = null; // hides "… is typing" when they stop
@@ -46,6 +47,14 @@ if (socketUrl) {
     }
   }
 
+  // "Online" and "2 online" are green; "Last seen …" is grey.
+  function showPresence(text) {
+    presence.textContent = text;
+    const online = text.toLowerCase().includes("online");
+    presence.classList.toggle("text-success", online);
+    presence.classList.toggle("text-body-secondary", !online);
+  }
+
   function connect() {
     const scheme = location.protocol === "https:" ? "wss" : "ws";
     socket = new WebSocket(`${scheme}://${location.host}${socketUrl}`);
@@ -62,6 +71,8 @@ if (socketUrl) {
         showTyping(`${data.name} is typing…`);
       } else if (data.type === "receipt") {
         receipt.textContent = data.text;
+      } else if (data.type === "presence") {
+        showPresence(data.text);
       } else if (data.type === "message.changed") {
         document.getElementById(`message-${data.id}`)
           ?.replaceWith(toElement(data.html));
@@ -104,6 +115,13 @@ if (socketUrl) {
       form.requestSubmit();
     }
   });
+
+  // Check in every 30 seconds so we keep showing as online.
+  setInterval(() => {
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "ping" }));
+    }
+  }, 30000);
 
   connect();
   scrollToBottom();

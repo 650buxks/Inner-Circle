@@ -8,12 +8,15 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.template.loader import render_to_string
 
+from accounts import presence
+
 from .models import Conversation, Message
 from .realtime import group_name
 from .services import (
     ChatError,
     is_member,
     mark_read,
+    presence_text,
     read_receipt,
     send_message,
 )
@@ -31,17 +34,37 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         self.group = group_name(self.chat_id)
         await self.channel_layer.group_add(self.group, self.channel_name)
         await self.accept()
+        await database_sync_to_async(presence.connected)(self.user)
+        # What the page already shows, so we only send changes.
+        self.presence_shown = await database_sync_to_async(presence_text)(
+            self.chat,
+            self.user,
+        )
+        await self.channel_layer.group_send(
+            self.group,
+            {"type": "presence.changed"},
+        )
 
     async def disconnect(self, code):
         if hasattr(self, "group"):
+            await database_sync_to_async(presence.disconnected)(self.user)
             await self.channel_layer.group_discard(
                 self.group,
                 self.channel_name,
+            )
+            await self.channel_layer.group_send(
+                self.group,
+                {"type": "presence.changed"},
             )
 
     # --- From the browser -------------------------------------------------
 
     async def receive_json(self, content):
+        if content.get("type") == "ping":
+            # The page checks in every 30 seconds: "I'm still here".
+            await database_sync_to_async(presence.still_here)(self.user)
+            await self.send_presence()
+            return
         if content.get("type") == "typing":
             # Not saved anywhere: just passed on to everyone else.
             await self.channel_layer.group_send(
@@ -94,6 +117,18 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             self.user,
         )
         await self.send_json({"type": "receipt", "text": text})
+
+    async def presence_changed(self, event):
+        await self.send_presence()
+
+    async def send_presence(self):
+        text = await database_sync_to_async(presence_text)(
+            self.chat,
+            self.user,
+        )
+        if text != self.presence_shown:
+            self.presence_shown = text
+            await self.send_json({"type": "presence", "text": text})
 
     # --- Database helpers (Django's ORM is synchronous) -------------------
 
