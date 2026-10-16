@@ -10,7 +10,13 @@ from django.template.loader import render_to_string
 
 from .models import Conversation, Message
 from .realtime import group_name
-from .services import ChatError, is_member, mark_read, send_message
+from .services import (
+    ChatError,
+    is_member,
+    mark_read,
+    read_receipt,
+    send_message,
+)
 
 
 class ChatConsumer(AsyncJsonWebsocketConsumer):
@@ -36,6 +42,17 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     # --- From the browser -------------------------------------------------
 
     async def receive_json(self, content):
+        if content.get("type") == "typing":
+            # Not saved anywhere: just passed on to everyone else.
+            await self.channel_layer.group_send(
+                self.group,
+                {
+                    "type": "user.typing",
+                    "user_id": self.user.pk,
+                    "name": self.user.name,
+                },
+            )
+            return
         if content.get("type") != "message":
             return
         body = str(content.get("body", ""))
@@ -65,6 +82,18 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                     "html": html,
                 }
             )
+
+    async def user_typing(self, event):
+        # Don't tell people that they themselves are typing.
+        if event["user_id"] != self.user.pk:
+            await self.send_json({"type": "typing", "name": event["name"]})
+
+    async def chat_read(self, event):
+        text = await database_sync_to_async(read_receipt)(
+            self.chat,
+            self.user,
+        )
+        await self.send_json({"type": "receipt", "text": text})
 
     # --- Database helpers (Django's ORM is synchronous) -------------------
 

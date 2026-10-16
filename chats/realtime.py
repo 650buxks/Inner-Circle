@@ -28,3 +28,10 @@ def broadcast(message, event_type):
     # Wait until the message is really saved, so nobody is told about a
     # message they can't load yet (or one that gets rolled back).
     transaction.on_commit(lambda: _send(message.conversation_id, event))
+
+
+def broadcast_read(conversation_id):
+    """Tell everyone viewing the chat that someone has read it, so the
+    "Seen" line under the last message can update."""
+    event = {"type": "chat.read"}
+    transaction.on_commit(lambda: _send(conversation_id, event))

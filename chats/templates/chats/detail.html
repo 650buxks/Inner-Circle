@@ -27,7 +27,8 @@
       <p id="no-messages" class="text-center text-body-secondary">No messages yet. Say hi! 👋</p>
     {% endfor %}
   </div>
-
+  <div id="read-receipt" class="small text-body-secondary text-end">{{ receipt }}</div>
+  <div id="typing" class="small text-body-secondary fst-italic"></div>
   <div id="chat-error" class="alert alert-danger d-none"></div>
 
   <form method="post" action="{% url 'chats:send' chat.pk %}" id="send" class="d-flex gap-2 mt-4"

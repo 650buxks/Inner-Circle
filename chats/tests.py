@@ -25,6 +25,7 @@ from .services import (
     leave_group,
     make_admin,
     mark_read,
+    read_receipt,
     remove_member,
     rename_group,
     send_message,
@@ -768,3 +769,79 @@ def test_older_messages_page_is_not_live(logged_in, chat):
     response = logged_in.get(url, {"before": 1})
 
     assert "/ws/chats/" not in response.content.decode()
+
+
+# --- Read receipts and typing ----------------------------------------------
+
+
+def test_no_receipt_until_they_read_it(chat, francis):
+    send_message(francis, chat, "Hi")
+
+    assert read_receipt(chat, francis) == ""
+
+
+def test_private_chat_receipt_says_seen(chat, francis, jordan):
+    send_message(francis, chat, "Hi")
+    mark_read(jordan, chat)
+
+    assert read_receipt(chat, francis) == "Seen"
+
+
+def test_group_receipt_says_who_has_seen_it(francis, jordan, sam):
+    group = create_group(francis, "Weekend plans", [jordan, sam])
+    send_message(francis, group, "Who's free?")
+    mark_read(jordan, group)
+
+    assert read_receipt(group, francis) == "Seen by jordan"
+
+
+def test_no_receipt_when_last_message_is_theirs(chat, francis, jordan):
+    send_message(francis, chat, "Hi")
+    send_message(jordan, chat, "Hey!")
+
+    assert read_receipt(chat, francis) == ""
+
+
+def test_chat_page_shows_receipt(logged_in, chat, francis, jordan):
+    send_message(francis, chat, "Hi")
+    mark_read(jordan, chat)
+
+    response = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    assert response.context["receipt"] == "Seen"
+
+
+@live
+def test_typing_is_shown_to_others_only(channel_layer, chat, francis, jordan):
+    async def scenario():
+        mine, theirs = socket_for(francis, chat), socket_for(jordan, chat)
+        await mine.connect()
+        await theirs.connect()
+
+        await mine.send_json_to({"type": "typing"})
+        for_them = await theirs.receive_json_from()
+        nothing_for_me = await mine.receive_nothing()
+
+        await mine.disconnect()
+        await theirs.disconnect()
+        return for_them, nothing_for_me
+
+    for_them, nothing_for_me = async_to_sync(scenario)()
+
+    assert for_them == {"type": "typing", "name": "francis"}
+    assert nothing_for_me
+
+
+@live
+def test_sender_sees_receipt_live(channel_layer, chat, francis, jordan):
+    send_message(francis, chat, "Hi")
+
+    async def scenario():
+        socket = socket_for(francis, chat)
+        await socket.connect()
+        await database_sync_to_async(mark_read)(jordan, chat)
+        received = await socket.receive_json_from()
+        await socket.disconnect()
+        return received
+
+    assert async_to_sync(scenario)() == {"type": "receipt", "text": "Seen"}
