@@ -10,7 +10,7 @@ from django.utils import timezone
 from friends.services import are_friends, is_blocked_between
 
 from .models import Conversation, Membership, Message
-from .realtime import broadcast
+from .realtime import broadcast, broadcast_read
 
 
 class ChatError(Exception):
@@ -252,6 +252,29 @@ def mark_read(user, conversation):
     Membership.objects.filter(conversation=conversation, user=user).update(
         last_read_at=timezone.now(),
     )
+    broadcast_read(conversation.pk)
+
+
+def read_receipt(conversation, user):
+    """The "Seen" line under `user`'s latest message ("" if none).
+
+    Private chats just say "Seen"; groups say who: "Seen by Jordan, Sam".
+    """
+    last = conversation.messages.exclude(kind=Message.Kind.SYSTEM).last()
+    if last is None or last.sender != user or last.is_deleted:
+        return ""
+    readers = (
+        conversation.memberships.exclude(user=user)
+        .filter(last_read_at__gte=last.created_at)
+        .select_related("user")
+        .order_by("user__username")
+    )
+    names = [membership.user.name for membership in readers]
+    if not names:
+        return ""
+    if conversation.kind == Conversation.Kind.PRIVATE:
+        return "Seen"
+    return "Seen by " + ", ".join(names)
 
 
 def unread_count(user, conversation):
