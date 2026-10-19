@@ -17,6 +17,7 @@ from .services import (
     delete_message,
     edit_message,
     get_or_create_private_chat,
+    inbox_entry,
     is_admin,
     is_member,
     leave_group,
@@ -27,24 +28,10 @@ from .services import (
     remove_member,
     rename_group,
     send_message,
-    unread_count,
 )
 
 # How many messages the chat page shows at a time.
 PAGE_SIZE = 50
-
-
-def preview(message, user):
-    """A short line of text for the inbox, like "You: see you at 7"."""
-    if message is None:
-        return "No messages yet"
-    if message.is_deleted:
-        return "Message deleted"
-    if message.kind == Message.Kind.SYSTEM:
-        return message.body
-    if message.sender == user:
-        return f"You: {message.body}"
-    return message.body
 
 
 def get_chat_for(user, pk):
@@ -81,12 +68,7 @@ def back_to_chat(chat):
 @login_required
 def inbox(request):
     me = request.user
-    chats = list(me.conversations.all())
-    for chat in chats:
-        chat.title = chat_title(chat, me)
-        chat.last_message = chat.messages.last()
-        chat.preview = preview(chat.last_message, me)
-        chat.unread = unread_count(me, chat)
+    chats = [inbox_entry(chat, me) for chat in me.conversations.all()]
     return render(request, "chats/inbox.html", {"chats": chats})
 
 

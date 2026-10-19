@@ -11,9 +11,10 @@ from django.template.loader import render_to_string
 from accounts import presence
 
 from .models import Conversation, Message
-from .realtime import group_name
+from .realtime import group_name, user_group
 from .services import (
     ChatError,
+    inbox_entry,
     is_member,
     mark_read,
     presence_text,
@@ -158,4 +159,72 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         return render_to_string(
             "chats/_message.html",
             {"message": message, "user": self.user},
+        )
+
+
+class InboxConsumer(AsyncJsonWebsocketConsumer):
+    """Keeps the chat list up to date, and counts as being online."""
+
+    async def connect(self):
+        self.user = self.scope["user"]
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+        self.group = user_group(self.user.pk)
+        await self.channel_layer.group_add(self.group, self.channel_name)
+        await self.accept()
+        await database_sync_to_async(presence.connected)(self.user)
+        await self.announce_presence()
+
+    async def disconnect(self, code):
+        if hasattr(self, "group"):
+            await database_sync_to_async(presence.disconnected)(self.user)
+            await self.channel_layer.group_discard(
+                self.group,
+                self.channel_name,
+            )
+            await self.announce_presence()
+
+    async def receive_json(self, content):
+        if content.get("type") == "ping":
+            await database_sync_to_async(presence.still_here)(self.user)
+
+    async def inbox_changed(self, event):
+        html = await self.render_row(event["chat_id"])
+        if html is None:
+            # They're no longer in this chat (for example, removed from a
+            # group), so take it off the list.
+            await self.send_json(
+                {"type": "inbox.remove", "id": event["chat_id"]},
+            )
+            return
+        await self.send_json(
+            {
+                "type": "inbox.row",
+                "id": event["chat_id"],
+                "html": html,
+                "to_top": event["to_top"],
+            }
+        )
+
+    async def announce_presence(self):
+        """Tell open chat pages that this person came online or left."""
+        for chat_id in await self.chat_ids():
+            await self.channel_layer.group_send(
+                group_name(chat_id),
+                {"type": "presence.changed"},
+            )
+
+    @database_sync_to_async
+    def chat_ids(self):
+        return list(self.user.conversations.values_list("pk", flat=True))
+
+    @database_sync_to_async
+    def render_row(self, chat_id):
+        chat = self.user.conversations.filter(pk=chat_id).first()
+        if chat is None:
+            return None
+        return render_to_string(
+            "chats/_inbox_row.html",
+            {"chat": inbox_entry(chat, self.user)},
         )
