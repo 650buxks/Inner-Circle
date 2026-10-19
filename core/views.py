@@ -33,7 +33,7 @@ def home(request):
     # Logged-in people go straight to their chats.
     if request.user.is_authenticated:
         return redirect("chats:inbox")
-    return render(request, "core/home.html", {"services": check_services()})
+    return render(request, "core/home.html")
 
 
 def health(request):

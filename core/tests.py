@@ -6,11 +6,13 @@ from core.tasks import ping
 
 
 @pytest.mark.django_db
-def test_home_page_loads(client):
+def test_landing_page_loads(client):
     response = client.get(reverse("core:home"))
 
     assert response.status_code == 200
-    assert "Clique is running" in response.content.decode()
+    page = response.content.decode()
+    assert "Your people, your chats" in page
+    assert reverse("accounts:signup") in page
 
 
 @pytest.mark.django_db
