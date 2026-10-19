@@ -27,6 +27,13 @@ else:
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
+# On Render, the site's public address (like clique.onrender.com) is given to
+# the app automatically, so it doesn't need to be typed in anywhere.
+RENDER_HOST = env("RENDER_EXTERNAL_HOSTNAME", default="")
+if RENDER_HOST:
+    ALLOWED_HOSTS.append(RENDER_HOST)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_HOST}")
+
 INSTALLED_APPS = [
     "daphne",  # must be first: makes `runserver` an ASGI server (needed for WebSockets)
     "django.contrib.admin",
