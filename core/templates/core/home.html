@@ -1,29 +1,57 @@
 {% extends "base.html" %}
 
+{% block title %}Clique · Your people, your chats{% endblock %}
+
 {% block content %}
-<div class="text-center mb-5">
-  <h1 class="display-4 fw-bold clique-brand">Clique</h1>
-  <p class="lead text-body-secondary">Your people, your chats, a little help from AI.</p>
+<div class="row align-items-center g-5 py-lg-4">
+  <div class="col-lg-6 text-center text-lg-start">
+    <h1 class="hero-logo clique-brand mb-2">Clique</h1>
+    <p class="hero-tagline text-body-secondary mb-4">
+      Your people, your chats, a little help from AI.
+    </p>
+    <p class="mb-4">
+      A private space for your closest friends: one-on-one and group chats
+      that update the moment someone types.
+    </p>
+    <div class="d-flex gap-2 justify-content-center justify-content-lg-start">
+      <a href="{% url 'accounts:signup' %}" class="btn btn-primary btn-lg px-4">Create account</a>
+      <a href="{% url 'accounts:login' %}" class="btn btn-outline-primary btn-lg px-4">Log in</a>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    {# A pretend conversation, so visitors can see what Clique feels like. #}
+    <div class="demo-chat card mx-auto p-4">
+      <div class="small text-body-secondary mb-3">Weekend plans · 3 online</div>
+      <div><span class="demo-bubble theirs">Who's free Saturday? 🌮</span></div>
+      <div class="text-end"><span class="demo-bubble mine">Me! Tacos at 7?</span></div>
+      <div><span class="demo-bubble theirs">Say less. I'm in 🙌</span></div>
+      <div class="small text-body-secondary fst-italic">Jordan is typing…</div>
+    </div>
+  </div>
 </div>
 
-<div class="card mx-auto" style="max-width: 28rem;">
-  <div class="card-body">
-    <h2 class="h5 card-title">Clique is running ✅</h2>
-    <p class="text-body-secondary small">Phase 0 setup check</p>
-    <ul class="list-group list-group-flush">
-      {% for name, status in services.items %}
-        <li class="list-group-item d-flex justify-content-between">
-          <span class="text-capitalize">{{ name }}</span>
-          {% if status == "ok" %}
-            <span class="badge text-bg-success">ok</span>
-          {% elif status == "error" %}
-            <span class="badge text-bg-danger">error</span>
-          {% else %}
-            <span class="badge text-bg-secondary">{{ status }}</span>
-          {% endif %}
-        </li>
-      {% endfor %}
-    </ul>
+<div class="row g-4 mt-4 text-center">
+  <div class="col-md-4">
+    <div class="card h-100 p-4">
+      <div class="feature-icon mb-2">⚡</div>
+      <h2 class="h5">Real-time</h2>
+      <p class="text-body-secondary small mb-0">Messages, typing and read receipts show up instantly.</p>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100 p-4">
+      <div class="feature-icon mb-2">👯</div>
+      <h2 class="h5">Just your circle</h2>
+      <p class="text-body-secondary small mb-0">Only friends can message you. Group chats for every crew.</p>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100 p-4">
+      <div class="feature-icon mb-2">✨</div>
+      <h2 class="h5">AI that helps</h2>
+      <p class="text-body-secondary small mb-0">Coming soon: catch up on busy chats and get help replying.</p>
+    </div>
   </div>
 </div>
 {% endblock %}

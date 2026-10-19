@@ -29,7 +29,7 @@ cp .env.example .env          # local settings; never commit this file
 docker compose up --build     # first run takes a few minutes
 ```
 
-Open http://localhost:8000. You should see **"Clique is running ✅"** with the database and Redis both showing **ok**.
+Open http://localhost:8000 to see the Clique landing page. To check that the database and Redis are connected, open http://localhost:8000/health/: both should say **ok**.
 
 Press `Ctrl+C` to stop. Next time, `docker compose up` is enough (add `--build` after changing `requirements*.txt`).
 
