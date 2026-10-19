@@ -10,7 +10,7 @@ from django.utils import timezone
 from friends.services import are_friends, is_blocked_between
 
 from .models import Conversation, Membership, Message
-from .realtime import broadcast, broadcast_read
+from .realtime import broadcast, broadcast_read, update_inboxes
 
 
 class ChatError(Exception):
@@ -49,6 +49,28 @@ def presence_text(conversation, user):
     others = conversation.members.exclude(pk=user.pk)
     online = sum(1 for person in others if person.is_online)
     return f"{online} online" if online else ""
+
+
+def preview(message, user):
+    """A short line of text for the inbox, like "You: see you at 7"."""
+    if message is None:
+        return "No messages yet"
+    if message.is_deleted:
+        return "Message deleted"
+    if message.kind == Message.Kind.SYSTEM:
+        return message.body
+    if message.sender == user:
+        return f"You: {message.body}"
+    return message.body
+
+
+def inbox_entry(conversation, user):
+    """Add what the inbox shows about a chat: title, preview, unread."""
+    conversation.title = chat_title(conversation, user)
+    conversation.last_message = conversation.messages.last()
+    conversation.preview = preview(conversation.last_message, user)
+    conversation.unread = unread_count(user, conversation)
+    return conversation
 
 
 def private_key(user, other):
@@ -161,6 +183,8 @@ def remove_member(user, conversation, person):
     if not deleted:
         raise ChatError(f"{person.name} isn't in this group.")
     add_system_message(conversation, f"{user.name} removed {person.name}")
+    # They're not a member any more, so this takes the chat off their inbox.
+    update_inboxes([person.pk], conversation.pk)
 
 
 def make_admin(user, conversation, person):
@@ -266,7 +290,7 @@ def mark_read(user, conversation):
     Membership.objects.filter(conversation=conversation, user=user).update(
         last_read_at=timezone.now(),
     )
-    broadcast_read(conversation.pk)
+    broadcast_read(conversation.pk, user.pk)
 
 
 def read_receipt(conversation, user):

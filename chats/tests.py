@@ -945,3 +945,101 @@ def test_status_updates_live(channel_layer, chat, francis, jordan):
 
     assert came_online["text"] == "Online"
     assert went_offline["text"] == "Last seen just now"
+
+
+# --- Live inbox -----------------------------------------------------------
+
+
+def inbox_socket_for(user):
+    """A pretend browser tab with the inbox open, logged in as `user`."""
+    communicator = WebsocketCommunicator(
+        URLRouter(websocket_urlpatterns),
+        "/ws/inbox/",
+    )
+    communicator.scope["user"] = user
+    return communicator
+
+
+def test_inbox_page_connects_live(logged_in):
+    response = logged_in.get(reverse("chats:inbox"))
+
+    assert "/ws/inbox/" in response.content.decode()
+
+
+@live
+def test_logged_out_people_cannot_open_live_inbox(channel_layer):
+    async def scenario():
+        connected, _ = await inbox_socket_for(AnonymousUser()).connect()
+        return connected
+
+    assert not async_to_sync(scenario)()
+
+
+@live
+def test_new_message_moves_chat_to_top(channel_layer, chat, francis, jordan):
+    async def scenario():
+        inbox = inbox_socket_for(jordan)
+        await inbox.connect()
+        await database_sync_to_async(send_message)(francis, chat, "Hi!")
+        row = await receive(inbox, "inbox.row")
+        await inbox.disconnect()
+        return row
+
+    row = async_to_sync(scenario)()
+
+    assert row["id"] == chat.pk
+    assert row["to_top"]
+    assert "Hi!" in row["html"]
+    assert "badge" in row["html"]  # 1 unread
+
+
+@live
+def test_reading_clears_unread_badge(channel_layer, chat, francis, jordan):
+    send_message(francis, chat, "Hi!")
+
+    async def scenario():
+        inbox = inbox_socket_for(jordan)
+        await inbox.connect()
+        await database_sync_to_async(mark_read)(jordan, chat)
+        row = await receive(inbox, "inbox.row")
+        await inbox.disconnect()
+        return row
+
+    row = async_to_sync(scenario)()
+
+    assert not row["to_top"]  # stays where it is
+    assert "badge" not in row["html"]
+
+
+@live
+def test_removed_member_loses_the_chat(channel_layer, francis, jordan):
+    group = create_group(francis, "Weekend plans", [jordan])
+
+    async def scenario():
+        inbox = inbox_socket_for(jordan)
+        await inbox.connect()
+        await database_sync_to_async(remove_member)(francis, group, jordan)
+        removed = await receive(inbox, "inbox.remove")
+        await inbox.disconnect()
+        return removed
+
+    assert async_to_sync(scenario)() == {
+        "type": "inbox.remove",
+        "id": group.pk,
+    }
+
+
+@live
+def test_having_inbox_open_counts_as_online(channel_layer, jordan):
+    def is_online():
+        return User.objects.get(pk=jordan.pk).is_online
+
+    async def scenario():
+        inbox = inbox_socket_for(jordan)
+        await inbox.connect()
+        online = await database_sync_to_async(is_online)()
+        await inbox.disconnect()
+        return online
+
+    assert async_to_sync(scenario)()
+    assert not is_online()
