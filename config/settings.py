@@ -163,8 +163,23 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# --- Uploaded files (chat photos) ------------------------------------------
+
+# Locally, uploads go in the media/ folder. In production they go to
+# Cloudinary, because Render's free disk is wiped on every deploy.
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+CLOUDINARY_URL = env("CLOUDINARY_URL", default="")
+
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": {
+        "BACKEND": (
+            "core.storage.CloudinaryStorage"
+            if CLOUDINARY_URL
+            else "django.core.files.storage.FileSystemStorage"
+        ),
+    },
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
 

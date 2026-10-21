@@ -35,12 +35,17 @@
   <div id="chat-error" class="alert alert-danger d-none"></div>
 
   <form method="post" action="{% url 'chats:send' chat.pk %}" id="send" class="d-flex gap-2 mt-4"
+        enctype="multipart/form-data"
         {% if live %}data-socket-url="/ws/chats/{{ chat.pk }}/"{% endif %}>
     {% csrf_token %}
+    <label class="btn btn-outline-primary" title="Add a photo">
+      📷<input type="file" name="photo" id="photo-input" accept="image/jpeg,image/png,image/gif,image/webp" class="d-none">
+    </label>
     <textarea name="body" class="form-control" rows="1" maxlength="{{ max_length }}"
-              placeholder="Message {{ title }}" required autofocus></textarea>
+              placeholder="Message {{ title }}" autofocus></textarea>
     <button type="submit" class="btn btn-primary">Send</button>
   </form>
+  <div id="photo-chosen" class="small text-body-secondary mt-1"></div>
 </div>
 
 <script src="{% static 'js/chat.js' %}"></script>

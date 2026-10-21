@@ -6,6 +6,7 @@ one place.
 
 from django.db import transaction
 from django.utils import timezone
+from PIL import Image
 
 from friends.services import are_friends, is_blocked_between
 
@@ -59,9 +60,12 @@ def preview(message, user):
         return "Message deleted"
     if message.kind == Message.Kind.SYSTEM:
         return message.body
+    text = message.body
+    if message.photo:
+        text = f"📷 {text}" if text else "📷 Photo"
     if message.sender == user:
-        return f"You: {message.body}"
-    return message.body
+        return f"You: {text}"
+    return text
 
 
 def inbox_entry(conversation, user):
@@ -228,10 +232,31 @@ def add_system_message(conversation, text):
     )
 
 
+# Pillow's names for the photo types we accept.
+PHOTO_FORMATS = {"JPEG", "PNG", "GIF", "WEBP"}
+
+
+def check_photo(photo):
+    """Make sure an upload is a real photo of a sensible size."""
+    if photo.size > Message.MAX_PHOTO_SIZE:
+        raise ChatError("Photos can be at most 10 MB.")
+    try:
+        # Pillow reads the file itself, so a renamed .exe or a PDF called
+        # "cat.jpg" is caught here, whatever its name says.
+        with Image.open(photo) as image:
+            image_format = image.format
+            image.verify()
+    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError):
+        raise ChatError("That file isn't a photo we can show.") from None
+    if image_format not in PHOTO_FORMATS:
+        raise ChatError("Photos must be JPEG, PNG, GIF or WebP.")
+    photo.seek(0)  # rewind, so the whole file gets saved
+
+
 @transaction.atomic
-def send_message(user, conversation, body):
+def send_message(user, conversation, body, photo=None):
     body = body.strip()
-    if not body:
+    if not body and not photo:
         raise ChatError("You can't send an empty message.")
     if len(body) > Message.MAX_LENGTH:
         limit = Message.MAX_LENGTH
@@ -242,18 +267,27 @@ def send_message(user, conversation, body):
         person = other_person(conversation, user)
         if person is None or is_blocked_between(user, person):
             raise ChatError("You can't message this person.")
+    if photo:
+        check_photo(photo)
 
-    message = _save_message(conversation, sender=user, body=body)
+    message = _save_message(conversation, sender=user, body=body, photo=photo)
     mark_read(user, conversation)
     return message
 
 
-def _save_message(conversation, sender, body, kind=Message.Kind.TEXT):
+def _save_message(
+    conversation,
+    sender,
+    body,
+    kind=Message.Kind.TEXT,
+    photo=None,
+):
     message = Message.objects.create(
         conversation=conversation,
         sender=sender,
         body=body,
         kind=kind,
+        photo=photo or "",
     )
     conversation.last_activity_at = message.created_at
     conversation.save(update_fields=["last_activity_at"])
@@ -280,9 +314,13 @@ def delete_message(user, message):
     """Replace the message with "Message deleted" (it keeps its place)."""
     if message.sender != user or message.kind != Message.Kind.TEXT:
         raise ChatError("You can only delete your own messages.")
+    if message.photo:
+        # Remove the photo file too, not just the link to it.
+        message.photo.delete(save=False)
+        message.photo = ""
     message.is_deleted = True
     message.body = ""
-    message.save(update_fields=["is_deleted", "body"])
+    message.save(update_fields=["is_deleted", "body", "photo"])
     broadcast(message, "message.changed")
 
 

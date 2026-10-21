@@ -1,3 +1,6 @@
+import uuid
+from pathlib import Path
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -87,6 +90,16 @@ class Membership(models.Model):
         return f"{self.user} in {self.conversation}"
 
 
+def photo_path(message, filename):
+    """Where a chat photo is saved, e.g. chats/12/3f9c…e1.jpg.
+
+    The random name means nobody can guess the address of someone else's
+    photo, and two photos called "IMG_0001.jpg" never clash.
+    """
+    extension = Path(filename).suffix.lower()
+    return f"chats/{message.conversation_id}/{uuid.uuid4().hex}{extension}"
+
+
 class Message(models.Model):
     class Kind(models.TextChoices):
         TEXT = "text", "Text"
@@ -94,6 +107,7 @@ class Message(models.Model):
         AI = "ai", "Clique AI"
 
     MAX_LENGTH = 4000
+    MAX_PHOTO_SIZE = 10 * 1024 * 1024  # 10 MB
 
     conversation = models.ForeignKey(
         Conversation,
@@ -117,6 +131,7 @@ class Message(models.Model):
     body = models.TextField(max_length=MAX_LENGTH, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     edited_at = models.DateTimeField(null=True, blank=True)
+    photo = models.ImageField(upload_to=photo_path, blank=True)
     is_deleted = models.BooleanField(default=False)
 
     class Meta:

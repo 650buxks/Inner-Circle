@@ -1,3 +1,4 @@
+import io
 from datetime import timedelta
 
 import pytest
@@ -8,9 +9,11 @@ from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
 from accounts import presence
 from friends.services import block_user
@@ -30,6 +33,7 @@ from .services import (
     make_admin,
     mark_read,
     presence_text,
+    preview,
     read_receipt,
     remove_member,
     rename_group,
@@ -1043,3 +1047,106 @@ def test_having_inbox_open_counts_as_online(channel_layer, jordan):
 
     assert async_to_sync(scenario)()
     assert not is_online()
+
+
+# --- Photos ----------------------------------------------------------------
+
+
+@pytest.fixture
+def media(settings, tmp_path):
+    """Save uploaded photos in a temporary folder that's deleted after."""
+    settings.MEDIA_ROOT = tmp_path
+    settings.STORAGES = {
+        **settings.STORAGES,
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+    }
+    return tmp_path
+
+
+def make_photo(name="cat.png", image_format="PNG"):
+    """A tiny real image, as if it had been uploaded from a browser."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (20, 20), "purple").save(buffer, image_format)
+    return SimpleUploadedFile(name, buffer.getvalue())
+
+
+def test_send_photo_with_caption(media, chat, francis):
+    message = send_message(francis, chat, "Look!", photo=make_photo())
+
+    assert message.body == "Look!"
+    assert message.photo.name.startswith(f"chats/{chat.pk}/")
+    assert message.photo.name.endswith(".png")
+    assert (media / message.photo.name).exists()
+
+
+def test_photo_can_be_sent_without_text(media, chat, francis):
+    message = send_message(francis, chat, "", photo=make_photo())
+
+    assert message.photo
+
+
+def test_photo_names_are_random(media, chat, francis):
+    first = send_message(francis, chat, "", photo=make_photo("IMG_1.png"))
+    second = send_message(francis, chat, "", photo=make_photo("IMG_1.png"))
+
+    assert first.photo.name != second.photo.name
+    assert "IMG_1" not in first.photo.name
+
+
+def test_fake_photo_is_rejected(media, chat, francis):
+    fake = SimpleUploadedFile("cat.jpg", b"definitely not a picture")
+
+    with pytest.raises(ChatError, match="isn't a photo"):
+        send_message(francis, chat, "", photo=fake)
+    assert not chat.messages.exists()
+
+
+def test_unusual_image_types_are_rejected(media, chat, francis):
+    with pytest.raises(ChatError, match="JPEG, PNG, GIF or WebP"):
+        send_message(francis, chat, "", photo=make_photo("cat.bmp", "BMP"))
+
+
+def test_photos_over_size_limit_rejected(media, chat, francis, monkeypatch):
+    monkeypatch.setattr(Message, "MAX_PHOTO_SIZE", 10)  # 10 bytes
+
+    with pytest.raises(ChatError, match="at most 10 MB"):
+        send_message(francis, chat, "", photo=make_photo())
+
+
+def test_inbox_preview_for_photos(media, chat, francis, jordan):
+    send_message(jordan, chat, "", photo=make_photo())
+    message = chat.messages.last()
+
+    assert preview(message, francis) == "📷 Photo"
+    assert preview(message, jordan) == "You: 📷 Photo"
+
+
+def test_deleting_a_photo_message_deletes_the_file(media, chat, francis):
+    message = send_message(francis, chat, "", photo=make_photo())
+    path = media / message.photo.name
+
+    delete_message(francis, message)
+
+    message.refresh_from_db()
+    assert not message.photo
+    assert not path.exists()
+
+
+def test_send_photo_from_chat_page(media, logged_in, chat):
+    url = reverse("chats:send", args=[chat.pk])
+
+    logged_in.post(url, {"body": "", "photo": make_photo()})
+
+    message = chat.messages.get()
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+    assert message.photo.url in page.content.decode()
+
+
+def test_chat_page_has_photo_button(logged_in, chat):
+    response = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    page = response.content.decode()
+    assert 'name="photo"' in page
+    assert 'enctype="multipart/form-data"' in page

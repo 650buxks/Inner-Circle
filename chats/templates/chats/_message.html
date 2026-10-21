@@ -9,7 +9,16 @@
     {% if message.is_deleted %}
       <div class="d-inline-block px-3 py-2 rounded-3 border fst-italic text-body-secondary">Message deleted</div>
     {% else %}
-      <div class="d-inline-block px-3 py-2 rounded-3 text-start {% if message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
+      {% if message.photo %}
+        <div>
+          <a href="{{ message.photo.url }}" target="_blank" rel="noopener">
+            <img src="{{ message.photo.url }}" alt="Photo from {{ message.sender_name }}" class="chat-photo" loading="lazy">
+          </a>
+        </div>
+      {% endif %}
+      {% if message.body %}
+        <div class="d-inline-block px-3 py-2 rounded-3 text-start {% if message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
+      {% endif %}
       {% if message.sender == user and message.kind == "text" %}
         <div class="small">
           <a href="{% url 'chats:edit' message.pk %}" class="link-secondary">Edit</a>
