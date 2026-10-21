@@ -23,6 +23,8 @@ services:
       # web app instead (same code, no extra service).
       - key: CELERY_TASK_ALWAYS_EAGER
         value: "true"
+      - key: CLOUDINARY_URL
+        sync: false # asked for during setup: paste Cloudinary's API URL
 
   - type: keyvalue # Render's Redis-compatible store, for live messaging
     name: clique-redis

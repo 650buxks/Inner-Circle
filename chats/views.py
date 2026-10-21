@@ -117,7 +117,12 @@ def start_chat(request, username):
 def send(request, pk):
     chat = get_chat_for(request.user, pk)
     try:
-        send_message(request.user, chat, request.POST.get("body", ""))
+        send_message(
+            request.user,
+            chat,
+            request.POST.get("body", ""),
+            photo=request.FILES.get("photo"),
+        )
     except ChatError as error:
         messages.error(request, str(error))
     return back_to_chat(chat)

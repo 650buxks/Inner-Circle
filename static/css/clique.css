@@ -117,6 +117,16 @@ body {
   background: var(--clique-gradient) !important;
 }
 
+/* Photos in chats. */
+.chat-photo {
+  display: inline-block;
+  max-width: min(100%, 18rem);
+  max-height: 20rem;
+  margin-bottom: 0.25rem;
+  border-radius: 1rem;
+  object-fit: cover;
+}
+
 /* --- Avatars and online status ------------------------------------------- */
 
 /* Round "avatar" with the person's first initial, until profile photos arrive. */

@@ -12,6 +12,9 @@ if (socketUrl) {
   const receipt = document.getElementById("read-receipt");
   const typing = document.getElementById("typing");
   const presence = document.getElementById("presence");
+  const photoInput = document.getElementById("photo-input");
+  const photoChosen = document.getElementById("photo-chosen");
+  const MAX_PHOTO_SIZE = 10 * 1024 * 1024; // 10 MB, the same as the server
   const csrfToken = form.querySelector("[name=csrfmiddlewaretoken]").value;
   let socket = null;
   let typingTimer = null; // hides "… is typing" when they stop
@@ -88,7 +91,28 @@ if (socketUrl) {
     });
   }
 
+  // Show which photo is about to be sent, and stop files that are too big
+  // before they're uploaded.
+  photoInput.addEventListener("change", () => {
+    const photo = photoInput.files[0];
+    if (photo && photo.size > MAX_PHOTO_SIZE) {
+      photoInput.value = "";
+      showError("Photos can be at most 10 MB.");
+      photoChosen.textContent = "";
+      return;
+    }
+    showError("");
+    photoChosen.textContent = photo ? `📷 ${photo.name} will be sent` : "";
+  });
+
   form.addEventListener("submit", (event) => {
+    if (photoInput.files.length) {
+      return; // photos are uploaded by posting the form normally
+    }
+    if (!textarea.value.trim()) {
+      event.preventDefault(); // nothing to send
+      return;
+    }
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return; // not connected: let the form post normally
     }
