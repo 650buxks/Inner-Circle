@@ -1128,6 +1128,20 @@ def test_photos_over_size_limit_rejected(media, chat, francis, monkeypatch):
         send_message(francis, chat, "", photo=make_photo())
 
 
+def test_failed_upload_shows_a_friendly_error(media, chat, francis, monkeypatch, caplog):
+    def broken_save(*args, **kwargs):
+        raise RuntimeError("Cloudinary is down")
+
+    storage = Message._meta.get_field("photo").storage
+    monkeypatch.setattr(storage, "save", broken_save)
+
+    with pytest.raises(ChatError, match="Couldn't upload your photo"):
+        send_message(francis, chat, "Look!", photo=make_photo())
+
+    assert not chat.messages.exists()  # no half-saved message
+    assert "Cloudinary is down" in caplog.text  # real error still logged
+
+
 def test_inbox_preview_for_photos(media, chat, francis, jordan):
     send_message(jordan, chat, "", photo=make_photo())
     message = chat.messages.last()
