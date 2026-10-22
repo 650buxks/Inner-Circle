@@ -4,6 +4,8 @@ Like friends/services.py, views call these functions so every rule lives in
 one place.
 """
 
+import logging
+
 from django.db import transaction
 from django.utils import timezone
 from PIL import Image
@@ -12,6 +14,8 @@ from friends.services import are_friends, is_blocked_between
 
 from .models import Conversation, Membership, Message
 from .realtime import broadcast, broadcast_read, update_inboxes
+
+logger = logging.getLogger(__name__)
 
 
 class ChatError(Exception):
@@ -271,7 +275,22 @@ def send_message(user, conversation, body, photo=None):
     if photo:
         check_photo(photo)
 
-    message = _save_message(conversation, sender=user, body=body, photo=photo)
+    try:
+        message = _save_message(
+            conversation,
+            sender=user,
+            body=body,
+            photo=photo,
+        )
+    except Exception:
+        if not photo:
+            raise
+        # Saving the photo means talking to Cloudinary, which can fail
+        # (wrong key, service down...). Record the real error for us, and
+        # show the person a friendly message instead of a crashed page.
+        logger.exception("Photo upload failed")
+        error = "Couldn't upload your photo. Please try again."
+        raise ChatError(error) from None
     mark_read(user, conversation)
     return message
 
