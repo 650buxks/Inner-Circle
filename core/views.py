@@ -25,6 +25,9 @@ def check_services():
             results["redis"] = "error"
     else:
         results["redis"] = "not configured"
+    # Where uploaded photos are saved. Production needs "cloudinary":
+    # files saved on Render's own disk vanish at the next deploy.
+    results["photos"] = "cloudinary" if settings.CLOUDINARY_URL else "local"
 
     return results
 

@@ -232,8 +232,9 @@ def add_system_message(conversation, text):
     )
 
 
-# Pillow's names for the photo types we accept.
-PHOTO_FORMATS = {"JPEG", "PNG", "GIF", "WEBP"}
+# Pillow's names for the photo types we accept. "MPO" is a JPEG with extra
+# pictures inside (iPhones and many cameras save photos this way).
+PHOTO_FORMATS = {"JPEG", "MPO", "PNG", "GIF", "WEBP"}
 
 
 def check_photo(photo):

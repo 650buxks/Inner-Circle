@@ -25,6 +25,7 @@ def test_health_reports_database_ok(client):
 
     assert response.status_code == 200
     assert response.json()["database"] == "ok"
+    assert response.json()["photos"] == "local"  # no Cloudinary in tests
 
 
 def test_celery_task_runs():

@@ -1103,6 +1103,19 @@ def test_fake_photo_is_rejected(media, chat, francis):
     assert not chat.messages.exists()
 
 
+def test_iphone_style_jpeg_is_accepted(media, chat, francis):
+    # iPhones save JPEGs with extra pictures inside, which Pillow calls
+    # "MPO". They're still JPEGs, so they must be allowed.
+    buffer = io.BytesIO()
+    first, second = Image.new("RGB", (20, 20)), Image.new("RGB", (20, 20))
+    first.save(buffer, "MPO", save_all=True, append_images=[second])
+    photo = SimpleUploadedFile("IMG_0001.jpg", buffer.getvalue())
+
+    message = send_message(francis, chat, "", photo=photo)
+
+    assert message.photo.name.endswith(".jpg")
+
+
 def test_unusual_image_types_are_rejected(media, chat, francis):
     with pytest.raises(ChatError, match="JPEG, PNG, GIF or WebP"):
         send_message(francis, chat, "", photo=make_photo("cat.bmp", "BMP"))
