@@ -87,3 +87,26 @@ def test_cloudinary_storage(monkeypatch):
     assert url.startswith("https://res.cloudinary.com/demo/image/upload/")
     assert url.endswith("/chats/1/abc")
     assert calls[1] == ("destroy", "chats/1/abc")
+
+
+@pytest.fixture
+def logged_in(client, db):
+    user = get_user_model().objects.create_user(username="francis", password="pass")
+    client.force_login(user)
+    return client
+
+
+def test_pages_have_a_phone_menu(logged_in):
+    response = logged_in.get(reverse("chats:inbox"))
+
+    page = response.content.decode()
+    assert 'data-bs-toggle="collapse"' in page  # the ☰ button
+    assert "bootstrap.bundle.min.js" in page  # the code that opens it
+
+
+def test_menu_highlights_the_current_page(logged_in):
+    response = logged_in.get(reverse("friends:list"))
+
+    page = response.content.decode()
+    assert 'aria-current="page" href="/friends/"' in page
+    assert 'aria-current="page" href="/chats/"' not in page
