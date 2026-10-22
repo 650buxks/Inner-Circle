@@ -14,25 +14,55 @@
   <link href="{% static 'css/clique.css' %}" rel="stylesheet">
 </head>
 <body>
-  <nav class="navbar border-bottom clique-nav">
+  <nav class="navbar navbar-expand-lg border-bottom clique-nav">
     <div class="container">
       <a class="navbar-brand clique-brand" href="{% url 'core:home' %}">Clique</a>
       {% if user.is_authenticated %}
-        <div class="d-flex align-items-center gap-3">
-          <a class="navbar-text text-decoration-none" href="{% url 'accounts:profile' user.username %}">Hi, {{ user.name }}</a>
-          <a class="btn btn-link btn-sm" href="{% url 'chats:inbox' %}">Chats</a>
-          <a class="btn btn-link btn-sm" href="{% url 'friends:list' %}">Friends</a>
-          <a class="btn btn-link btn-sm" href="{% url 'friends:find' %}">Find people</a>
-          <a class="btn btn-link btn-sm" href="{% url 'friends:requests' %}">
-            Requests
-            {% if friend_request_count %}<span class="badge rounded-pill text-bg-danger">{{ friend_request_count }}</span>{% endif %}
-          </a>
-          <a class="btn btn-link btn-sm" href="{% url 'accounts:settings' %}">Settings</a>
-          <form method="post" action="{% url 'accounts:logout' %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-outline-secondary btn-sm">Log out</button>
-          </form>
-        </div>
+        {% with here=request.resolver_match.view_name %}
+          {# On phones the links fold away behind this ☰ button. #}
+          <button class="navbar-toggler position-relative" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#main-menu"
+                  aria-controls="main-menu" aria-expanded="false" aria-label="Open menu">
+            <span class="navbar-toggler-icon"></span>
+            {% if friend_request_count %}
+              <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger rounded-circle">
+                <span class="visually-hidden">New friend requests</span>
+              </span>
+            {% endif %}
+          </button>
+
+          <div class="collapse navbar-collapse" id="main-menu">
+            <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+              <li class="nav-item">
+                <a class="nav-link text-body-secondary" href="{% url 'accounts:profile' user.username %}">Hi, {{ user.name }}</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link{% if here == 'chats:inbox' %} active{% endif %}" {% if here == 'chats:inbox' %}aria-current="page"{% endif %} href="{% url 'chats:inbox' %}">Chats</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link{% if here == 'friends:list' %} active{% endif %}" {% if here == 'friends:list' %}aria-current="page"{% endif %} href="{% url 'friends:list' %}">Friends</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link{% if here == 'friends:find' %} active{% endif %}" {% if here == 'friends:find' %}aria-current="page"{% endif %} href="{% url 'friends:find' %}">Find people</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link{% if here == 'friends:requests' %} active{% endif %}" {% if here == 'friends:requests' %}aria-current="page"{% endif %} href="{% url 'friends:requests' %}">
+                  Requests
+                  {% if friend_request_count %}<span class="badge rounded-pill text-bg-danger">{{ friend_request_count }}</span>{% endif %}
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link{% if here == 'accounts:settings' %} active{% endif %}" {% if here == 'accounts:settings' %}aria-current="page"{% endif %} href="{% url 'accounts:settings' %}">Settings</a>
+              </li>
+              <li class="nav-item">
+                <form method="post" action="{% url 'accounts:logout' %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-secondary btn-sm mt-2 mt-lg-0">Log out</button>
+                </form>
+              </li>
+            </ul>
+          </div>
+        {% endwith %}
       {% else %}
         <div class="d-flex gap-2">
           <a class="btn btn-link btn-sm" href="{% url 'accounts:login' %}">Log in</a>
@@ -51,5 +81,8 @@
 
     {% block content %}{% endblock %}
   </main>
+
+  {# Bootstrap's JavaScript: makes the ☰ menu open and close. #}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
 </body>
 </html>
