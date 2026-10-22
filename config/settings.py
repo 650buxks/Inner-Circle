@@ -137,6 +137,18 @@ CELERY_RESULT_BACKEND = None
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=not REDIS_URL)
 CELERY_TASK_EAGER_PROPAGATES = True
 
+# --- Logging ----------------------------------------------------------------
+
+# Print errors, with the full traceback, to the console. In production that
+# means a "Server Error (500)" shows up in Render's Logs with the reason.
+# (Django only does this by itself while DEBUG is on.)
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"django": {"handlers": ["console"], "level": "WARNING"}},
+}
+
 # --- Email ------------------------------------------------------------------
 
 # While developing, emails are printed in the terminal (`docker compose logs

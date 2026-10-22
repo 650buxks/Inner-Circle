@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from core.storage import CloudinaryStorage
 from core.tasks import ping
+from core.views import photo_storage
 
 
 @pytest.mark.django_db
@@ -26,6 +27,22 @@ def test_health_reports_database_ok(client):
     assert response.status_code == 200
     assert response.json()["database"] == "ok"
     assert response.json()["photos"] == "local"  # no Cloudinary in tests
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("", "local"),
+        ("cloudinary://123:secret@demo", "cloudinary"),
+        ("CLOUDINARY_URL=cloudinary://123:secret@demo", "misconfigured"),
+        ("cloudinary://<your_api_key>:<your_api_secret>@demo", "misconfigured"),
+        ("https://api.cloudinary.com/v1_1/my-cloud", "misconfigured"),
+    ],
+)
+def test_photo_storage_spots_bad_keys(settings, value, expected):
+    settings.CLOUDINARY_URL = value
+
+    assert photo_storage() == expected
 
 
 def test_celery_task_runs():
