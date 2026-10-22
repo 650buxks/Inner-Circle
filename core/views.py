@@ -5,6 +5,24 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 
 
+def photo_storage():
+    """Where uploaded photos are saved: "cloudinary", "local", or
+    "misconfigured" if the Cloudinary setting is there but written wrongly.
+
+    Production needs "cloudinary": files saved on Render's own disk vanish
+    at the next deploy.
+    """
+    url = settings.CLOUDINARY_URL
+    if not url:
+        return "local"
+    # The right format is cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+    if not url.startswith("cloudinary://") or "@" not in url or " " in url:
+        return "misconfigured"
+    if "<" in url:  # placeholders like <your_api_secret> left in
+        return "misconfigured"
+    return "cloudinary"
+
+
 def check_services():
     """Return {"database": "ok" | "error", "redis": "ok" |
     "error" | "not configured"}."""
@@ -25,9 +43,7 @@ def check_services():
             results["redis"] = "error"
     else:
         results["redis"] = "not configured"
-    # Where uploaded photos are saved. Production needs "cloudinary":
-    # files saved on Render's own disk vanish at the next deploy.
-    results["photos"] = "cloudinary" if settings.CLOUDINARY_URL else "local"
+    results["photos"] = photo_storage()
 
     return results
 
