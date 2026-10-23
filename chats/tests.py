@@ -38,6 +38,7 @@ from .services import (
     remove_member,
     rename_group,
     send_message,
+    split_attachment,
     unread_count,
 )
 
@@ -1164,7 +1165,7 @@ def test_deleting_a_photo_message_deletes_the_file(media, chat, francis):
 def test_send_photo_from_chat_page(media, logged_in, chat):
     url = reverse("chats:send", args=[chat.pk])
 
-    logged_in.post(url, {"body": "", "photo": make_photo()})
+    logged_in.post(url, {"body": "", "attachment": make_photo()})
 
     message = chat.messages.get()
     page = logged_in.get(reverse("chats:detail", args=[chat.pk]))
@@ -1175,5 +1176,97 @@ def test_chat_page_has_photo_button(logged_in, chat):
     response = logged_in.get(reverse("chats:detail", args=[chat.pk]))
 
     page = response.content.decode()
-    assert 'name="photo"' in page
+    assert 'name="attachment"' in page
     assert 'enctype="multipart/form-data"' in page
+
+
+# --- Videos ----------------------------------------------------------------
+
+# How each video format starts. Real files continue with the video itself;
+# for tests, the start is all that matters.
+VIDEO_STARTS = {
+    "mp4": b"\x00\x00\x00\x18ftypmp42",
+    "mov": b"\x00\x00\x00\x14ftypqt  ",
+    "webm": b"\x1a\x45\xdf\xa3",
+}
+
+
+def make_video(video_type="mp4", name="clip.mp4"):
+    content = VIDEO_STARTS[video_type] + b"\x00" * 100
+    return SimpleUploadedFile(name, content)
+
+
+def test_send_video(media, chat, francis):
+    message = send_message(francis, chat, "Watch this", video=make_video())
+
+    assert message.video.name.startswith(f"chats/{chat.pk}/videos/")
+    assert message.video.name.endswith(".mp4")
+    assert (media / message.video.name).exists()
+
+
+def test_iphone_mov_video_is_accepted(media, chat, francis):
+    video = make_video("mov", name="IMG_0042.MOV")
+
+    message = send_message(francis, chat, "", video=video)
+
+    assert message.video.name.endswith(".mov")
+
+
+def test_fake_video_is_rejected(media, chat, francis):
+    fake = SimpleUploadedFile("clip.mp4", b"not really a video")
+
+    with pytest.raises(ChatError, match="MP4, MOV or WebM"):
+        send_message(francis, chat, "", video=fake)
+
+
+def test_videos_over_size_limit_rejected(media, chat, francis, monkeypatch):
+    monkeypatch.setattr(Message, "MAX_VIDEO_SIZE", 10)  # 10 bytes
+
+    with pytest.raises(ChatError, match="at most 50 MB"):
+        send_message(francis, chat, "", video=make_video())
+
+
+def test_uploads_are_sorted_into_photos_and_videos():
+    photo, video = make_photo(), make_video("webm", name="clip.webm")
+
+    assert split_attachment(photo) == (photo, None)
+    assert split_attachment(video) == (None, video)
+    assert split_attachment(None) == (None, None)
+
+
+def test_inbox_preview_for_videos(media, chat, francis):
+    message = send_message(francis, chat, "", video=make_video())
+
+    assert preview(message, francis) == "You: 🎬 Video"
+
+
+def test_deleting_a_video_message_deletes_the_file(media, chat, francis):
+    message = send_message(francis, chat, "", video=make_video())
+    path = media / message.video.name
+
+    delete_message(francis, message)
+
+    assert not path.exists()
+
+
+def test_send_video_from_chat_page(media, logged_in, chat):
+    url = reverse("chats:send", args=[chat.pk])
+
+    logged_in.post(url, {"body": "", "attachment": make_video()})
+
+    message = chat.messages.get()
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+    assert f'<video src="{message.video.url}"' in page.content.decode()
+
+
+def test_background_upload_gets_a_short_answer(media, logged_in, chat):
+    url = reverse("chats:send", args=[chat.pk])
+    background = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+
+    sent = logged_in.post(url, {"attachment": make_photo()}, **background)
+    fake = SimpleUploadedFile("cat.jpg", b"nope")
+    failed = logged_in.post(url, {"attachment": fake}, **background)
+
+    assert sent.json() == {"ok": True}
+    assert failed.status_code == 400
+    assert "isn't a photo" in failed.json()["error"]

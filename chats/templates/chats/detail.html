@@ -38,14 +38,16 @@
         enctype="multipart/form-data"
         {% if live %}data-socket-url="/ws/chats/{{ chat.pk }}/"{% endif %}>
     {% csrf_token %}
-    <label class="btn btn-outline-primary" title="Add a photo">
-      📷<input type="file" name="photo" id="photo-input" accept="image/jpeg,image/png,image/gif,image/webp" class="d-none">
+    <label class="btn btn-outline-primary" title="Add a photo or video">
+      📎<input type="file" name="attachment" id="attachment-input" class="d-none"
+               accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm">
     </label>
     <textarea name="body" class="form-control" rows="1" maxlength="{{ max_length }}"
               placeholder="Message {{ title }}" autofocus></textarea>
     <button type="submit" class="btn btn-primary">Send</button>
   </form>
-  <div id="photo-chosen" class="small text-body-secondary mt-1"></div>
+  <div id="attachment-chosen" class="small text-body-secondary mt-1"></div>
+  <progress id="upload-progress" class="w-100 d-none" max="100" value="0"></progress>
 </div>
 
 <script src="{% static 'js/chat.js' %}"></script>

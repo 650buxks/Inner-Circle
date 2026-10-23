@@ -89,6 +89,25 @@ def test_cloudinary_storage(monkeypatch):
     assert calls[1] == ("destroy", "chats/1/abc")
 
 
+def test_cloudinary_storage_handles_videos(monkeypatch):
+    calls = []
+
+    def fake_upload(content, **options):
+        calls.append(options["resource_type"])
+        return {"public_id": options["public_id"], "format": "mov"}
+
+    monkeypatch.setattr(cloudinary.uploader, "upload", fake_upload)
+    monkeypatch.setattr(cloudinary.config(), "cloud_name", "demo")
+    storage = CloudinaryStorage()
+
+    name = storage.save("chats/1/videos/abc.mov", ContentFile(b"video"))
+    url = storage.url(name)
+
+    assert calls == ["video"]
+    assert "/demo/video/upload/" in url
+    assert url.endswith("/chats/1/videos/abc.mp4")  # converted for browsers
+
+
 @pytest.fixture
 def logged_in(client, db):
     user = get_user_model().objects.create_user(username="francis", password="pass")

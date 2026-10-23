@@ -90,6 +90,13 @@ class Membership(models.Model):
         return f"{self.user} in {self.conversation}"
 
 
+def video_path(message, filename):
+    """Where a chat video is saved, e.g. chats/12/videos/3f9c…e1.mp4."""
+    extension = Path(filename).suffix.lower()
+    name = f"{uuid.uuid4().hex}{extension}"
+    return f"chats/{message.conversation_id}/videos/{name}"
+
+
 def photo_path(message, filename):
     """Where a chat photo is saved, e.g. chats/12/3f9c…e1.jpg.
 
@@ -108,6 +115,7 @@ class Message(models.Model):
 
     MAX_LENGTH = 4000
     MAX_PHOTO_SIZE = 10 * 1024 * 1024  # 10 MB
+    MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50 MB
 
     conversation = models.ForeignKey(
         Conversation,
@@ -132,6 +140,7 @@ class Message(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     edited_at = models.DateTimeField(null=True, blank=True)
     photo = models.ImageField(upload_to=photo_path, blank=True)
+    video = models.FileField(upload_to=video_path, blank=True)
     is_deleted = models.BooleanField(default=False)
 
     class Meta:

@@ -158,6 +158,12 @@ body {
   object-fit: cover;
 }
 
+/* The upload progress bar under the message box. */
+#upload-progress {
+  height: 0.4rem;
+  accent-color: var(--clique-purple);
+}
+
 /* --- Avatars and online status ------------------------------------------- */
 
 /* Round "avatar" with the person's first initial, until profile photos arrive. */

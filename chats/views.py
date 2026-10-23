@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -28,6 +28,7 @@ from .services import (
     remove_member,
     rename_group,
     send_message,
+    split_attachment,
 )
 
 # How many messages the chat page shows at a time.
@@ -116,15 +117,25 @@ def start_chat(request, username):
 @require_POST
 def send(request, pk):
     chat = get_chat_for(request.user, pk)
+    # chat.js uploads files in the background (to show a progress bar) and
+    # wants a short JSON answer instead of a whole new page.
+    from_script = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    photo, video = split_attachment(request.FILES.get("attachment"))
     try:
         send_message(
             request.user,
             chat,
             request.POST.get("body", ""),
-            photo=request.FILES.get("photo"),
+            photo=photo,
+            video=video,
         )
     except ChatError as error:
+        if from_script:
+            return JsonResponse({"error": str(error)}, status=400)
         messages.error(request, str(error))
+    else:
+        if from_script:
+            return JsonResponse({"ok": True})
     return back_to_chat(chat)
 
 
