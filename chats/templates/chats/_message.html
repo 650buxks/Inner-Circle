@@ -16,6 +16,11 @@
           </a>
         </div>
       {% endif %}
+      {% if message.video %}
+        <div>
+          <video src="{{ message.video.url }}" class="chat-photo" controls playsinline preload="metadata"></video>
+        </div>
+      {% endif %}
       {% if message.body %}
         <div class="d-inline-block px-3 py-2 rounded-3 text-start {% if message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
       {% endif %}

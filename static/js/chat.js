@@ -12,9 +12,12 @@ if (socketUrl) {
   const receipt = document.getElementById("read-receipt");
   const typing = document.getElementById("typing");
   const presence = document.getElementById("presence");
-  const photoInput = document.getElementById("photo-input");
-  const photoChosen = document.getElementById("photo-chosen");
-  const MAX_PHOTO_SIZE = 10 * 1024 * 1024; // 10 MB, the same as the server
+  const fileInput = document.getElementById("attachment-input");
+  const fileChosen = document.getElementById("attachment-chosen");
+  const progressBar = document.getElementById("upload-progress");
+  // The same limits as the server.
+  const MAX_PHOTO_SIZE = 10 * 1024 * 1024; // 10 MB
+  const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB
   const csrfToken = form.querySelector("[name=csrfmiddlewaretoken]").value;
   let socket = null;
   let typingTimer = null; // hides "… is typing" when they stop
@@ -91,23 +94,67 @@ if (socketUrl) {
     });
   }
 
-  // Show which photo is about to be sent, and stop files that are too big
+  // Show which file is about to be sent, and stop files that are too big
   // before they're uploaded.
-  photoInput.addEventListener("change", () => {
-    const photo = photoInput.files[0];
-    if (photo && photo.size > MAX_PHOTO_SIZE) {
-      photoInput.value = "";
-      showError("Photos can be at most 10 MB.");
-      photoChosen.textContent = "";
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    const isVideo = file?.type.startsWith("video/");
+    const limit = isVideo ? MAX_VIDEO_SIZE : MAX_PHOTO_SIZE;
+    if (file && file.size > limit) {
+      fileInput.value = "";
+      showError(isVideo ? "Videos can be at most 50 MB." : "Photos can be at most 10 MB.");
+      fileChosen.textContent = "";
       return;
     }
     showError("");
-    photoChosen.textContent = photo ? `📷 ${photo.name} will be sent` : "";
+    const icon = isVideo ? "🎬" : "📷";
+    fileChosen.textContent = file ? `${icon} ${file.name} will be sent` : "";
   });
 
+  // Upload a photo or video in the background, with a progress bar.
+  // XMLHttpRequest is used instead of fetch() because it can report how much
+  // of the upload has been sent so far.
+  function upload() {
+    const request = new XMLHttpRequest();
+    request.open("POST", form.action);
+    request.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+    request.responseType = "json";
+
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) {
+        progressBar.value = (event.loaded / event.total) * 100;
+      }
+    });
+
+    request.addEventListener("load", () => {
+      progressBar.classList.add("d-none");
+      if (request.status === 200) {
+        // Success: the message itself arrives over the WebSocket.
+        form.reset();
+        fileChosen.textContent = "";
+      } else {
+        showError(request.response?.error || "Something went wrong.");
+      }
+    });
+
+    request.addEventListener("error", () => {
+      progressBar.classList.add("d-none");
+      showError("Upload failed. Check your connection and try again.");
+    });
+
+    progressBar.value = 0;
+    progressBar.classList.remove("d-none");
+    showError("");
+    request.send(new FormData(form)); // the text, the file and the CSRF token
+  }
+
   form.addEventListener("submit", (event) => {
-    if (photoInput.files.length) {
-      return; // photos are uploaded by posting the form normally
+    if (fileInput.files.length) {
+      if (socket?.readyState === WebSocket.OPEN) {
+        event.preventDefault();
+        upload();
+      }
+      return; // not connected: post the form normally
     }
     if (!textarea.value.trim()) {
       event.preventDefault(); // nothing to send

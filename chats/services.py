@@ -67,6 +67,8 @@ def preview(message, user):
     text = message.body
     if message.photo:
         text = f"📷 {text}" if text else "📷 Photo"
+    elif message.video:
+        text = f"🎬 {text}" if text else "🎬 Video"
     if message.sender == user:
         return f"You: {text}"
     return text
@@ -252,16 +254,52 @@ def check_photo(photo):
             image_format = image.format
             image.verify()
     except (OSError, SyntaxError, ValueError, Image.DecompressionBombError):
-        raise ChatError("That file isn't a photo we can show.") from None
+        error = "That file isn't a photo or video we can show."
+        raise ChatError(error) from None
     if image_format not in PHOTO_FORMATS:
         raise ChatError("Photos must be JPEG, PNG, GIF or WebP.")
     photo.seek(0)  # rewind, so the whole file gets saved
 
 
+def video_format(upload):
+    """ "mp4", "mov" or "webm" if the file really is a video, else None.
+
+    Like photos, we look at the first bytes of the file itself rather than
+    trusting its name. These "magic numbers" are how each format starts.
+    """
+    head = upload.read(12)
+    upload.seek(0)
+    if head[4:8] == b"ftyp":  # MP4 and iPhone MOV files
+        return "mov" if head[8:12] == b"qt  " else "mp4"
+    if head[:4] == b"\x1a\x45\xdf\xa3":  # WebM
+        return "webm"
+    return None
+
+
+def check_video(video):
+    """Make sure an upload is a real video of a sensible size."""
+    if video.size > Message.MAX_VIDEO_SIZE:
+        raise ChatError("Videos can be at most 50 MB.")
+    video_type = video_format(video)
+    if video_type is None:
+        raise ChatError("Videos must be MP4, MOV or WebM.")
+    # Name it after what it really is, whatever it was called.
+    video.name = f"video.{video_type}"
+
+
+def split_attachment(upload):
+    """Sort an uploaded file into (photo, video): one of them is None."""
+    if upload is None:
+        return None, None
+    if video_format(upload):
+        return None, upload
+    return upload, None
+
+
 @transaction.atomic
-def send_message(user, conversation, body, photo=None):
+def send_message(user, conversation, body, photo=None, video=None):
     body = body.strip()
-    if not body and not photo:
+    if not body and not photo and not video:
         raise ChatError("You can't send an empty message.")
     if len(body) > Message.MAX_LENGTH:
         limit = Message.MAX_LENGTH
@@ -274,6 +312,8 @@ def send_message(user, conversation, body, photo=None):
             raise ChatError("You can't message this person.")
     if photo:
         check_photo(photo)
+    if video:
+        check_video(video)
 
     try:
         message = _save_message(
@@ -281,15 +321,17 @@ def send_message(user, conversation, body, photo=None):
             sender=user,
             body=body,
             photo=photo,
+            video=video,
         )
     except Exception:
-        if not photo:
+        if not photo and not video:
             raise
-        # Saving the photo means talking to Cloudinary, which can fail
+        # Saving the file means talking to Cloudinary, which can fail
         # (wrong key, service down...). Record the real error for us, and
         # show the person a friendly message instead of a crashed page.
-        logger.exception("Photo upload failed")
-        error = "Couldn't upload your photo. Please try again."
+        logger.exception("Upload failed")
+        kind = "photo" if photo else "video"
+        error = f"Couldn't upload your {kind}. Please try again."
         raise ChatError(error) from None
     mark_read(user, conversation)
     return message
@@ -301,6 +343,7 @@ def _save_message(
     body,
     kind=Message.Kind.TEXT,
     photo=None,
+    video=None,
 ):
     message = Message.objects.create(
         conversation=conversation,
@@ -308,6 +351,7 @@ def _save_message(
         body=body,
         kind=kind,
         photo=photo or "",
+        video=video or "",
     )
     conversation.last_activity_at = message.created_at
     conversation.save(update_fields=["last_activity_at"])
@@ -338,9 +382,12 @@ def delete_message(user, message):
         # Remove the photo file too, not just the link to it.
         message.photo.delete(save=False)
         message.photo = ""
+    if message.video:
+        message.video.delete(save=False)
+        message.video = ""
     message.is_deleted = True
     message.body = ""
-    message.save(update_fields=["is_deleted", "body", "photo"])
+    message.save(update_fields=["is_deleted", "body", "photo", "video"])
     broadcast(message, "message.changed")
 
 
