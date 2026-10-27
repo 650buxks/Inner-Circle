@@ -158,6 +158,34 @@ body {
   object-fit: cover;
 }
 
+/* Square tiles on a chat's Media page. */
+.media-tile {
+  position: relative;
+  display: block;
+  aspect-ratio: 1; /* always a square, whatever shape the photo is */
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: var(--clique-soft);
+}
+
+.media-tile img,
+.media-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* fill the square, cropping the edges if needed */
+}
+
+.media-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 2rem;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
 /* The upload progress bar under the message box. */
 #upload-progress {
   height: 0.4rem;

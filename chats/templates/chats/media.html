@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Media · {{ title }} · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 48rem;">
+  <a href="{% url 'chats:detail' chat.pk %}" class="btn btn-link btn-sm px-0 mb-2">&larr; Back to chat</a>
+  <h1 class="h4 mb-4">Photos and videos <span class="text-body-secondary fs-6">with {{ title }}</span></h1>
+
+  {% if items %}
+    <div class="row row-cols-3 row-cols-md-4 g-2">
+      {% for message in items %}
+        <div class="col">
+          {% if message.photo %}
+            <a href="{{ message.photo.url }}" target="_blank" rel="noopener" class="media-tile">
+              <img src="{{ message.photo.url }}" alt="Photo from {{ message.sender_name }}" loading="lazy">
+            </a>
+          {% else %}
+            <a href="{{ message.video.url }}" target="_blank" rel="noopener" class="media-tile">
+              <video src="{{ message.video.url }}" preload="metadata" muted playsinline></video>
+              <span class="media-play">▶</span>
+            </a>
+          {% endif %}
+          <div class="small text-body-secondary text-truncate mt-1">
+            {{ message.sender_name }} · {{ message.created_at|date:"M j" }}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-body-secondary">No photos or videos yet. Send one with 📎 in the chat.</p>
+  {% endif %}
+</div>
+{% endblock %}
