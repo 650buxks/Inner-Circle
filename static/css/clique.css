@@ -205,6 +205,11 @@ body {
   font-weight: 600;
 }
 
+/* Profile photos: fill the circle, cropping the edges if needed. */
+img.avatar {
+  object-fit: cover;
+}
+
 .avatar-lg {
   width: 6rem;
   height: 6rem;

@@ -12,6 +12,7 @@ from .models import Conversation, Message
 from .services import (
     ChatError,
     add_members,
+    chat_partner,
     chat_title,
     create_group,
     delete_message,
@@ -97,6 +98,7 @@ def chat_detail(request, pk):
         "max_length": Message.MAX_LENGTH,
         "live": not before,
         "receipt": read_receipt(chat, request.user),
+        "person": chat_partner(chat, request.user),
         "presence": presence_text(chat, request.user),
     }
     return render(request, "chats/detail.html", context)

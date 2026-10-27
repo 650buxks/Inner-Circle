@@ -9,8 +9,8 @@ import logging
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from PIL import Image
 
+from core import uploads
 from friends.services import are_friends, is_blocked_between
 
 from .models import Conversation, Membership, Message
@@ -33,6 +33,13 @@ def other_person(conversation, user):
     their account)."""
     membership = conversation.memberships.exclude(user=user).first()
     return membership.user if membership else None
+
+
+def chat_partner(conversation, user):
+    """The other person in a private chat (None for groups)."""
+    if conversation.kind == Conversation.Kind.PRIVATE:
+        return other_person(conversation, user)
+    return None
 
 
 def chat_title(conversation, user):
@@ -78,6 +85,8 @@ def preview(message, user):
 def inbox_entry(conversation, user):
     """Add what the inbox shows about a chat: title, preview, unread."""
     conversation.title = chat_title(conversation, user)
+    # The other person in a private chat, for their profile photo.
+    conversation.person = chat_partner(conversation, user)
     conversation.last_message = conversation.messages.last()
     conversation.preview = preview(conversation.last_message, user)
     conversation.unread = unread_count(user, conversation)
@@ -239,27 +248,12 @@ def add_system_message(conversation, text):
     )
 
 
-# Pillow's names for the photo types we accept. "MPO" is a JPEG with extra
-# pictures inside (iPhones and many cameras save photos this way).
-PHOTO_FORMATS = {"JPEG", "MPO", "PNG", "GIF", "WEBP"}
-
-
 def check_photo(photo):
     """Make sure an upload is a real photo of a sensible size."""
-    if photo.size > Message.MAX_PHOTO_SIZE:
-        raise ChatError("Photos can be at most 10 MB.")
     try:
-        # Pillow reads the file itself, so a renamed .exe or a PDF called
-        # "cat.jpg" is caught here, whatever its name says.
-        with Image.open(photo) as image:
-            image_format = image.format
-            image.verify()
-    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError):
-        error = "That file isn't a photo or video we can show."
-        raise ChatError(error) from None
-    if image_format not in PHOTO_FORMATS:
-        raise ChatError("Photos must be JPEG, PNG, GIF or WebP.")
-    photo.seek(0)  # rewind, so the whole file gets saved
+        uploads.check_photo(photo, Message.MAX_PHOTO_SIZE)
+    except uploads.BadUpload as error:
+        raise ChatError(str(error)) from None
 
 
 def video_format(upload):

@@ -7,7 +7,11 @@
 <div class="mx-auto" style="max-width: 36rem;">
   <div class="d-flex align-items-center gap-3 mb-4">
     <a href="{% url 'chats:inbox' %}" class="btn btn-link btn-sm px-0">&larr; Chats</a>
-    <div class="avatar avatar-sm">{{ title|first|upper }}</div>
+    {% if person %}
+      {% include "_avatar.html" with size="avatar-sm" %}
+    {% else %}
+      <div class="avatar avatar-sm">{{ title|first|upper }}</div>
+    {% endif %}
     <div>
       <h1 class="h5 mb-0">{{ title }}</h1>
       <div id="presence" class="small {% if "online" in presence|lower %}text-success{% else %}text-body-secondary{% endif %}">{{ presence }}</div>

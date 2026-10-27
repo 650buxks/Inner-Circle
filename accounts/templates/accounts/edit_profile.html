@@ -7,7 +7,7 @@
   <div class="card-body p-4">
     <h1 class="h3 mb-4">Edit profile</h1>
 
-    <form method="post" novalidate>
+    <form method="post" enctype="multipart/form-data" novalidate>
       {% csrf_token %}
 
       {% for field in form %}

@@ -1126,7 +1126,7 @@ def test_unusual_image_types_are_rejected(media, chat, francis):
 def test_photos_over_size_limit_rejected(media, chat, francis, monkeypatch):
     monkeypatch.setattr(Message, "MAX_PHOTO_SIZE", 10)  # 10 bytes
 
-    with pytest.raises(ChatError, match="at most 10 MB"):
+    with pytest.raises(ChatError, match="Photos can be at most"):
         send_message(francis, chat, "", photo=make_photo())
 
 

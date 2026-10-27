@@ -1,4 +1,6 @@
+import uuid
 from datetime import timedelta
+from pathlib import Path
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -11,6 +13,12 @@ from django.utils.timesince import timesince
 ONLINE_WINDOW = timedelta(seconds=90)
 
 
+def avatar_path(user, filename):
+    """Where a profile photo is saved, e.g. avatars/7/3f9c…e1.jpg."""
+    extension = Path(filename).suffix.lower()
+    return f"avatars/{user.pk}/{uuid.uuid4().hex}{extension}"
+
+
 class User(AbstractUser):
     """
     A Clique user: Django's built-in user plus profile and AI settings.
@@ -20,7 +28,14 @@ class User(AbstractUser):
         EVERYONE = "everyone", "Everyone"
         FRIENDS_OF_FRIENDS = "friends_of_friends", "Friends of friends only"
 
+    MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5 MB
+
     display_name = models.CharField(max_length=50, blank=True)
+    avatar = models.ImageField(
+        "profile photo",
+        upload_to=avatar_path,
+        blank=True,
+    )
     bio = models.TextField(max_length=300, blank=True)
     status_message = models.CharField(max_length=80, blank=True)
     last_seen = models.DateTimeField(null=True, blank=True)
