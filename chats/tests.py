@@ -38,6 +38,7 @@ from .services import (
     remove_member,
     rename_group,
     send_message,
+    shared_media,
     split_attachment,
     unread_count,
 )
@@ -1270,3 +1271,48 @@ def test_background_upload_gets_a_short_answer(media, logged_in, chat):
     assert sent.json() == {"ok": True}
     assert failed.status_code == 400
     assert "isn't a photo" in failed.json()["error"]
+
+
+# --- Media page ------------------------------------------------------------
+
+
+def test_shared_media_lists_photos_and_videos(media, chat, francis):
+    send_message(francis, chat, "Just text")
+    photo = send_message(francis, chat, "", photo=make_photo())
+    video = send_message(francis, chat, "", video=make_video())
+    deleted = send_message(francis, chat, "", photo=make_photo())
+    delete_message(francis, deleted)
+
+    assert list(shared_media(chat)) == [video, photo]  # newest first
+
+
+def test_media_page_shows_photos_and_videos(media, logged_in, chat, francis):
+    photo = send_message(francis, chat, "", photo=make_photo())
+    video = send_message(francis, chat, "", video=make_video())
+
+    response = logged_in.get(reverse("chats:media", args=[chat.pk]))
+
+    page = response.content.decode()
+    assert photo.photo.url in page
+    assert video.video.url in page
+
+
+def test_media_page_when_nothing_shared(logged_in, chat):
+    response = logged_in.get(reverse("chats:media", args=[chat.pk]))
+
+    assert "No photos or videos yet" in response.content.decode()
+
+
+def test_outsiders_cannot_see_media(client, chat):
+    outsider = User.objects.create_user(username="outsider", password="pass")
+    client.force_login(outsider)
+
+    response = client.get(reverse("chats:media", args=[chat.pk]))
+
+    assert response.status_code == 404
+
+
+def test_chat_page_links_to_media(logged_in, chat):
+    response = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    assert reverse("chats:media", args=[chat.pk]) in response.content.decode()

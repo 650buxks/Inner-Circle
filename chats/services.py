@@ -7,6 +7,7 @@ one place.
 import logging
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from PIL import Image
 
@@ -389,6 +390,16 @@ def delete_message(user, message):
     message.body = ""
     message.save(update_fields=["is_deleted", "body", "photo", "video"])
     broadcast(message, "message.changed")
+
+
+def shared_media(conversation):
+    """Every photo and video shared in the chat, newest first."""
+    has_media = ~Q(photo="") | ~Q(video="")
+    return (
+        conversation.messages.filter(has_media, is_deleted=False)
+        .select_related("sender")
+        .order_by("-created_at")
+    )
 
 
 def mark_read(user, conversation):

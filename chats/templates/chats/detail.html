@@ -12,9 +12,12 @@
       <h1 class="h5 mb-0">{{ title }}</h1>
       <div id="presence" class="small {% if "online" in presence|lower %}text-success{% else %}text-body-secondary{% endif %}">{{ presence }}</div>
     </div>
-    {% if chat.kind == "group" %}
-      <a href="{% url 'chats:group_settings' chat.pk %}" class="btn btn-outline-secondary btn-sm ms-auto">Group settings</a>
-    {% endif %}
+    <div class="ms-auto d-flex gap-2">
+      <a href="{% url 'chats:media' chat.pk %}" class="btn btn-outline-secondary btn-sm" title="Photos and videos">🖼️ Media</a>
+      {% if chat.kind == "group" %}
+        <a href="{% url 'chats:group_settings' chat.pk %}" class="btn btn-outline-secondary btn-sm">Group settings</a>
+      {% endif %}
+    </div>
   </div>
 
   {% if has_older %}

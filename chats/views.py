@@ -28,6 +28,7 @@ from .services import (
     remove_member,
     rename_group,
     send_message,
+    shared_media,
     split_attachment,
 )
 
@@ -190,6 +191,17 @@ def new_group(request):
         else:
             return redirect("chats:detail", pk=chat.pk)
     return render(request, "chats/new_group.html", {"form": form})
+
+
+@login_required
+def media(request, pk):
+    chat = get_chat_for(request.user, pk)
+    context = {
+        "chat": chat,
+        "title": chat_title(chat, request.user),
+        "items": shared_media(chat),
+    }
+    return render(request, "chats/media.html", context)
 
 
 @login_required
