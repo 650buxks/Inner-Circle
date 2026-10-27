@@ -89,11 +89,15 @@ def edit_profile(request):
     # Edit a fresh copy of the user, so a form with errors can't change the
     # name shown in the navbar before anything is saved.
     me = User.objects.get(pk=request.user.pk)
+    old_avatar = me.avatar.name
 
     if request.method == "POST":
-        form = ProfileForm(request.POST, instance=me)
+        form = ProfileForm(request.POST, request.FILES, instance=me)
         if form.is_valid():
             form.save()
+            # Django doesn't delete a replaced or removed file by itself.
+            if old_avatar and me.avatar.name != old_avatar:
+                me.avatar.storage.delete(old_avatar)
             messages.success(request, "Your profile has been updated.")
             return redirect("accounts:profile", username=me.username)
     else:
@@ -176,6 +180,8 @@ def delete_account(request):
     if form.is_valid():
         user = request.user
         logout(request)
+        if user.avatar:
+            user.avatar.delete(save=False)  # their photo goes too
         user.delete()
         messages.success(request, "Your account has been deleted.")
         return redirect("core:home")

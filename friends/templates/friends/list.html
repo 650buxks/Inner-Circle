@@ -11,7 +11,7 @@
       {% for person in friends %}
         {% with relationship="friends" %}
           <li class="list-group-item d-flex align-items-center gap-3">
-            <div class="avatar avatar-sm">{{ person.name|first|upper }}</div>
+            {% include "_avatar.html" with size="avatar-sm" %}
             <div class="flex-grow-1">
               <a class="fw-semibold text-decoration-none" href="{% url 'accounts:profile' person.username %}">{{ person.name }}</a>
               {% if person.is_online %}<span class="online-dot" title="Online"></span>{% endif %}

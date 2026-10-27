@@ -12,7 +12,7 @@
       {% for friend_request in received %}
         {% with person=friend_request.from_user relationship="request_received" %}
           <li class="list-group-item d-flex align-items-center gap-3">
-            <div class="avatar avatar-sm">{{ person.name|first|upper }}</div>
+            {% include "_avatar.html" with size="avatar-sm" %}
             <div class="flex-grow-1">
               <a class="fw-semibold text-decoration-none" href="{% url 'accounts:profile' person.username %}">{{ person.name }}</a>
               <div class="text-body-secondary small">@{{ person.username }} · {{ friend_request.created_at|timesince }} ago</div>
@@ -32,7 +32,7 @@
       {% for friend_request in sent %}
         {% with person=friend_request.to_user relationship="request_sent" %}
           <li class="list-group-item d-flex align-items-center gap-3">
-            <div class="avatar avatar-sm">{{ person.name|first|upper }}</div>
+            {% include "_avatar.html" with size="avatar-sm" %}
             <div class="flex-grow-1">
               <a class="fw-semibold text-decoration-none" href="{% url 'accounts:profile' person.username %}">{{ person.name }}</a>
               <div class="text-body-secondary small">@{{ person.username }} · {{ friend_request.created_at|timesince }} ago</div>

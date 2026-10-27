@@ -1,0 +1,7 @@
+{# A round profile photo, or the first letter of their name if they haven't added one. #}
+{# Use: {% include "_avatar.html" with person=someone size="avatar-sm" %} #}
+{% if person.avatar %}
+  <img src="{{ person.avatar.url }}" alt="{{ person.name }}" class="avatar {{ size }}">
+{% else %}
+  <div class="avatar {{ size }}">{{ person.name|first|upper }}</div>
+{% endif %}

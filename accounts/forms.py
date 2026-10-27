@@ -6,6 +6,9 @@ from django.contrib.auth.forms import (
     SetPasswordForm,
     UserCreationForm,
 )
+from django.core.files.uploadedfile import UploadedFile
+
+from core.uploads import BadUpload, check_photo
 
 from .models import User
 
@@ -51,18 +54,39 @@ class LoginForm(AuthenticationForm):
 class ProfileForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ("display_name", "username", "status_message", "bio")
+        fields = (
+            "avatar",
+            "display_name",
+            "username",
+            "status_message",
+            "bio",
+        )
         widgets = {
+            "avatar": forms.ClearableFileInput(
+                attrs={"accept": "image/jpeg,image/png,image/gif,image/webp"},
+            ),
             "bio": forms.Textarea(attrs={"rows": 4}),
         }
         help_texts = {
             "username": "Letters, numbers and @ . + - _ only.",
+            "avatar": "JPEG, PNG, GIF or WebP, up to 5 MB.",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs["class"] = "form-control"
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+        # Only check new uploads (not the photo that's already saved, and
+        # not False, which means "remove my photo").
+        if isinstance(avatar, UploadedFile):
+            try:
+                check_photo(avatar, User.MAX_AVATAR_SIZE)
+            except BadUpload as error:
+                raise forms.ValidationError(str(error)) from None
+        return avatar
 
 
 class StyledFormMixin:

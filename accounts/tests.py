@@ -1,9 +1,12 @@
+import io
 import re
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from PIL import Image
 
 User = get_user_model()
 
@@ -446,3 +449,111 @@ def test_reset_link_only_works_once(client, francis):
     response = client.get(link, follow=True)
 
     assert "This link doesn't work" in response.content.decode()
+
+
+# --- Profile photos ----------------------------------------------------------
+
+
+@pytest.fixture
+def media(settings, tmp_path):
+    """Save uploaded photos in a temporary folder that's deleted after."""
+    settings.MEDIA_ROOT = tmp_path
+    settings.STORAGES = {
+        **settings.STORAGES,
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+    }
+    return tmp_path
+
+
+def make_photo(name="me.png"):
+    buffer = io.BytesIO()
+    Image.new("RGB", (20, 20), "purple").save(buffer, "PNG")
+    return SimpleUploadedFile(name, buffer.getvalue())
+
+
+def save_profile(client, **changes):
+    """Post the Edit profile form, keeping francis's other details."""
+    data = {"display_name": "", "username": "francis", "status_message": ""}
+    data.update(changes)
+    return client.post(reverse("accounts:edit_profile"), data)
+
+
+def test_upload_profile_photo(media, client, francis):
+    client.force_login(francis)
+
+    save_profile(client, avatar=make_photo())
+
+    francis.refresh_from_db()
+    assert francis.avatar.name.startswith(f"avatars/{francis.pk}/")
+    assert (media / francis.avatar.name).exists()
+    page = client.get(reverse("accounts:profile", args=["francis"]))
+    assert francis.avatar.url in page.content.decode()
+
+
+def test_people_without_a_photo_keep_their_letter(client, francis):
+    client.force_login(francis)
+
+    page = client.get(reverse("accounts:profile", args=["francis"]))
+
+    assert '<div class="avatar avatar-lg mx-auto mb-3">F</div>' in (page.content.decode())
+
+
+def test_fake_profile_photo_is_rejected(media, client, francis):
+    client.force_login(francis)
+    fake = SimpleUploadedFile("me.jpg", b"not a picture")
+
+    response = save_profile(client, avatar=fake)
+
+    assert response.context["form"].errors["avatar"]  # shown on the form
+    francis.refresh_from_db()
+    assert not francis.avatar
+
+
+def test_profile_photo_size_limit(media, client, francis, monkeypatch):
+    monkeypatch.setattr(User, "MAX_AVATAR_SIZE", 10)  # 10 bytes
+    client.force_login(francis)
+
+    response = save_profile(client, avatar=make_photo())
+
+    assert "Photos can be at most" in response.content.decode()
+
+
+def test_new_photo_replaces_the_old_file(media, client, francis):
+    client.force_login(francis)
+    save_profile(client, avatar=make_photo())
+    francis.refresh_from_db()
+    old_file = media / francis.avatar.name
+
+    save_profile(client, avatar=make_photo("new.png"))
+
+    assert not old_file.exists()
+
+
+def test_remove_profile_photo(media, client, francis):
+    client.force_login(francis)
+    save_profile(client, avatar=make_photo())
+    francis.refresh_from_db()
+    old_file = media / francis.avatar.name
+
+    save_profile(client, **{"avatar-clear": "on"})  # the "Clear" tickbox
+
+    francis.refresh_from_db()
+    assert not francis.avatar
+    assert not old_file.exists()
+
+
+def test_deleting_account_deletes_profile_photo(media, client, francis):
+    client.force_login(francis)
+    save_profile(client, avatar=make_photo())
+    francis.refresh_from_db()
+    photo_file = media / francis.avatar.name
+
+    client.post(
+        reverse("accounts:delete_account"),
+        {"current_password": SIGNUP_PASSWORD},
+    )
+
+    assert not User.objects.filter(pk=francis.pk).exists()
+    assert not photo_file.exists()
