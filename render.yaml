@@ -25,7 +25,8 @@ services:
         value: "true"
       - key: CLOUDINARY_URL
         sync: false # asked for during setup: paste Cloudinary's API URL
-
+      - key: ANTHROPIC_API_KEY
+        sync: false # asked for during setup: paste your Claude API key
   - type: keyvalue # Render's Redis-compatible store, for live messaging
     name: clique-redis
     plan: free

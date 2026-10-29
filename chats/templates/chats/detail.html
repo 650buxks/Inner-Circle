@@ -23,6 +23,19 @@
       {% endif %}
     </div>
   </div>
+  {% if offer_catch_up %}
+    <div class="card p-3 mb-4 d-flex flex-row align-items-center gap-3 ai-card">
+      <div class="flex-grow-1">
+        <div class="fw-semibold">You missed {{ missed }} messages</div>
+        <div class="small text-body-secondary">Clique AI can sum them up for you.</div>
+      </div>
+      <form method="post" action="{% url 'chats:catch_up' chat.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="since" value="{{ last_read }}">
+        <button type="submit" class="btn btn-primary btn-sm">✨ Catch me up</button>
+      </form>
+    </div>
+  {% endif %}
 
   {% if has_older %}
     <div class="text-center mb-3">

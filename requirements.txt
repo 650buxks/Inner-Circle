@@ -9,3 +9,4 @@ django-environ>=0.14,<1
 whitenoise>=6.12,<7
 pillow>=12.0,<14  # reads and checks uploaded photos
 cloudinary>=1.46,<2  # stores photos and videos in production
+anthropic>=2.3,<3  # talks to Claude for Clique AI
