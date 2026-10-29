@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Catch me up · {{ title }} · Clique{% endblock %}
+
+{% block content %}
+<div class="mx-auto" style="max-width: 36rem;">
+  <a href="{% url 'chats:detail' chat.pk %}" class="btn btn-link btn-sm px-0 mb-2">&larr; Back to chat</a>
+
+  <div class="card p-4 ai-card">
+    <h1 class="h5 mb-3">✨ What you missed in {{ title }}</h1>
+    <div class="mb-3">{{ summary|linebreaksbr }}</div>
+    <p class="small text-body-secondary mb-0">
+      Written by Clique AI. It can make mistakes, so check the chat for anything important.
+    </p>
+  </div>
+</div>
+{% endblock %}

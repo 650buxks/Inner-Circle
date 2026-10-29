@@ -9,6 +9,7 @@ from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
 from django.urls import reverse
@@ -1134,8 +1135,9 @@ def test_failed_upload_shows_a_friendly_error(media, chat, francis, monkeypatch,
     def broken_save(*args, **kwargs):
         raise RuntimeError("Cloudinary is down")
 
-    storage = Message._meta.get_field("photo").storage
-    monkeypatch.setattr(storage, "save", broken_save)
+    # Break the class, not one storage object: Django can swap the object
+    # out during the test, which made the cleanup fail.
+    monkeypatch.setattr(FileSystemStorage, "save", broken_save)
 
     with pytest.raises(ChatError, match="Couldn't upload your photo"):
         send_message(francis, chat, "Look!", photo=make_photo())

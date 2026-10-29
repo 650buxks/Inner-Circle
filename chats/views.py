@@ -1,11 +1,15 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
+from ai.client import AIError
+from ai.services import catch_up as summarize_missed
 
 from .forms import AddMembersForm, GroupForm
 from .models import Conversation, Message
@@ -31,6 +35,7 @@ from .services import (
     send_message,
     shared_media,
     split_attachment,
+    unread_count,
 )
 
 # How many messages the chat page shows at a time.
@@ -78,7 +83,11 @@ def inbox(request):
 @login_required
 def chat_detail(request, pk):
     chat = get_chat_for(request.user, pk)
+    # Before marking the chat read: what did this person miss?
+    missed = unread_count(request.user, chat)
+    last_read = chat.memberships.get(user=request.user).last_read_at
     mark_read(request.user, chat)
+    enough = missed >= settings.CATCH_UP_MIN_UNREAD
 
     # Newest messages first, so we can take the latest PAGE_SIZE of them.
     newest_first = chat.messages.select_related("sender").order_by("-pk")
@@ -100,8 +109,32 @@ def chat_detail(request, pk):
         "receipt": read_receipt(chat, request.user),
         "person": chat_partner(chat, request.user),
         "presence": presence_text(chat, request.user),
+        "missed": missed,
+        "offer_catch_up": chat.ai_enabled and enough,
+        "last_read": last_read.isoformat() if last_read else "",
     }
     return render(request, "chats/detail.html", context)
+
+
+@login_required
+@require_POST
+def catch_up(request, pk):
+    chat = get_chat_for(request.user, pk)
+    joined = chat.memberships.get(user=request.user).joined_at
+    # Summarize from when they last read the chat (sent by the page), or
+    # from when they joined it.
+    since = parse_datetime(request.POST.get("since", "")) or joined
+    try:
+        summary = summarize_missed(request.user, chat, since)
+    except AIError as error:
+        messages.error(request, str(error))
+        return back_to_chat(chat)
+    context = {
+        "chat": chat,
+        "title": chat_title(chat, request.user),
+        "summary": summary,
+    }
+    return render(request, "chats/catch_up.html", context)
 
 
 @login_required

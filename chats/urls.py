@@ -9,6 +9,7 @@ urlpatterns = [
     path("<int:pk>/", views.chat_detail, name="detail"),
     path("<int:pk>/send/", views.send, name="send"),
     path("<int:pk>/media/", views.media, name="media"),
+    path("<int:pk>/catch-up/", views.catch_up, name="catch_up"),
     path("start/<str:username>/", views.start_chat, name="start"),
     path("messages/<int:pk>/edit/", views.edit, name="edit"),
     path("messages/<int:pk>/delete/", views.delete, name="delete"),
