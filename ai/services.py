@@ -88,11 +88,17 @@ MENTION = re.compile(r"(?<![\w@.])@clique\b", re.IGNORECASE)
 LIST_MARKER = re.compile(r"^\s*(?:[-•*]|\d+[.)])\s+")
 
 
-def check_daily_limit(user):
+def uses_left(user):
+    """How many more times `user` can use Clique AI today."""
     today = timezone.localdate()
     used = user.ai_requests.filter(created_at__date=today).count()
-    if used >= settings.AI_DAILY_LIMIT:
-        error = f"You've used Clique AI {used} times today."
+    return max(settings.AI_DAILY_LIMIT - used, 0)
+
+
+def check_daily_limit(user):
+    if not uses_left(user):
+        limit = settings.AI_DAILY_LIMIT
+        error = f"You've used Clique AI {limit} times today."
         raise AIError(f"{error} It resets tomorrow.")
 
 
@@ -152,6 +158,8 @@ def catch_up(user, conversation, since):
 
 def suggest_replies(user, conversation):
     """A few short replies `user` could send next in `conversation`."""
+    if not user.smart_replies_on:
+        raise AIError("Smart replies are turned off in your settings.")
     if not conversation.ai_enabled:
         raise AIError("Clique AI is turned off in this chat.")
     check_daily_limit(user)

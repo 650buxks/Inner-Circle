@@ -141,12 +141,12 @@ class AISettingsForm(StyledFormMixin, forms.ModelForm):
         fields = ("smart_replies_on", "ai_opt_out")
         labels = {
             "smart_replies_on": "Show smart reply suggestions",
-            "ai_opt_out": "Leave my messages out of AI summaries",
+            "ai_opt_out": "Leave my messages out of Clique AI",
         }
         help_texts = {
-            "smart_replies_on": "Quick replies shown above the chat box.",
+            "smart_replies_on": "The ✨ Help me reply button above the chat box.",
             "ai_opt_out": "Clique AI won't read your messages when friends "
-            "ask it to catch them up.",
+            "use it (Catch me up, Help me reply, @clique).",
         }
 
 

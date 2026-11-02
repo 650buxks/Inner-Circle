@@ -16,6 +16,26 @@
     </form>
   {% endif %}
 
+  <h2 class="h6">Clique AI</h2>
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <span class="me-auto small">
+      {% if chat.ai_enabled %}
+        ✨ On: anyone here can use Catch me up, Help me reply and @clique.
+      {% else %}
+        Off: nobody can use Clique AI in this group.
+      {% endif %}
+    </span>
+    {% if is_admin %}
+      <form method="post" action="{% url 'chats:ai_switch' chat.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="on" value="{% if chat.ai_enabled %}0{% else %}1{% endif %}">
+        <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">
+          Turn {% if chat.ai_enabled %}off{% else %}on{% endif %}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+
   <h2 class="h6">Members ({{ memberships|length }})</h2>
   <ul class="list-group mb-4">
     {% for membership in memberships %}

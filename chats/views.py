@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 from accounts.models import User
 from ai.client import AIError
 from ai.services import catch_up as summarize_missed
-from ai.services import suggest_replies, write_draft
+from ai.services import suggest_replies, uses_left, write_draft
 
 from .forms import AddMembersForm, GroupForm
 from .models import Conversation, Message
@@ -34,6 +34,7 @@ from .services import (
     remove_member,
     rename_group,
     send_message,
+    set_ai_enabled,
     shared_media,
     split_attachment,
     unread_count,
@@ -113,6 +114,8 @@ def chat_detail(request, pk):
         "missed": missed,
         "offer_catch_up": chat.ai_enabled and enough,
         "last_read": last_read.isoformat() if last_read else "",
+        "ai_uses_left": uses_left(request.user),
+        "ai_limit": settings.AI_DAILY_LIMIT,
     }
     return render(request, "chats/detail.html", context)
 
@@ -147,7 +150,7 @@ def reply_ideas(request, pk):
         replies = suggest_replies(request.user, chat)
     except AIError as error:
         return JsonResponse({"error": str(error)}, status=400)
-    return JsonResponse({"replies": replies})
+    return JsonResponse({"replies": replies, "uses_left": uses_left(request.user)})
 
 
 @login_required
@@ -164,7 +167,7 @@ def draft(request, pk):
         )
     except AIError as error:
         return JsonResponse({"error": str(error)}, status=400)
-    return JsonResponse({"draft": text})
+    return JsonResponse({"draft": text, "uses_left": uses_left(request.user)})
 
 
 @login_required
@@ -283,6 +286,18 @@ def group_settings(request, pk):
         "add_form": AddMembersForm(user=request.user, conversation=chat),
     }
     return render(request, "chats/group_settings.html", context)
+
+
+@login_required
+@require_POST
+def ai_switch(request, pk):
+    """Group admins turn Clique AI on or off for the whole group."""
+    chat = get_group_for(request.user, pk)
+    try:
+        set_ai_enabled(request.user, chat, request.POST.get("on") == "1")
+    except ChatError as error:
+        messages.error(request, str(error))
+    return back_to_settings(chat)
 
 
 def back_to_settings(chat):
