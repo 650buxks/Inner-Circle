@@ -31,7 +31,10 @@
 
   <div class="card mb-4">
     <div class="card-body p-4">
-      <h2 class="h5 mb-3">AI settings</h2>
+      <h2 class="h5 mb-1">AI settings</h2>
+      <p class="small text-body-secondary mb-3">
+        You have {{ ai_uses_left }} of {{ ai_limit }} Clique AI uses left today.
+      </p>
       <form method="post" action="{% url 'accounts:ai_settings' %}">
         {% csrf_token %}
         {% for field in ai_form %}{% include "accounts/_field.html" %}{% endfor %}

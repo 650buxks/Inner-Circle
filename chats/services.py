@@ -187,6 +187,18 @@ def rename_group(user, conversation, name):
 
 
 @transaction.atomic
+def set_ai_enabled(user, conversation, enabled):
+    """Turn Clique AI on or off for everyone in a group."""
+    _check_admin(user, conversation)
+    if conversation.ai_enabled == enabled:
+        return
+    conversation.ai_enabled = enabled
+    conversation.save(update_fields=["ai_enabled"])
+    state = "on" if enabled else "off"
+    add_system_message(conversation, f"{user.name} turned Clique AI {state}")
+
+
+@transaction.atomic
 def add_members(user, conversation, people):
     _check_admin(user, conversation)
     for person in people:

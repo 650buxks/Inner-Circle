@@ -16,6 +16,7 @@ if (ideas) {
   const textarea = document.querySelector("#send textarea");
   const csrfToken = document.querySelector("#send [name=csrfmiddlewaretoken]").value;
   const errorBox = document.getElementById("chat-error");
+  const usesLeft = document.getElementById("ai-uses-left");
   let lastDraft = null; // the last message Clique AI wrote into the box
 
   function showError(text) {
@@ -56,6 +57,7 @@ if (ideas) {
       });
       const data = await response.json();
       if (response.ok) {
+        usesLeft.textContent = data.uses_left;
         return data;
       }
       showError(data.error || "Something went wrong.");
@@ -96,7 +98,8 @@ if (ideas) {
     textarea.form.scrollIntoView({ block: "end" }); // keep the ideas in view
   }
 
-  button.addEventListener("click", () =>
+  // Missing when smart replies are turned off in settings.
+  button?.addEventListener("click", () =>
     whileThinking(button, async () => {
       const data = await askClique(ideas.dataset.url);
       if (data) {

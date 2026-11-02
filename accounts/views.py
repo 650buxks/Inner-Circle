@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -13,6 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 
+from ai.services import uses_left
 from friends.services import (
     accepts_requests_from,
     mutual_friends,
@@ -117,6 +119,8 @@ def settings_page(request, **forms):
         "privacy_form": PrivacyForm(instance=user),
         "delete_form": DeleteAccountForm(user=user),
         "blocked_users": user.blocked_users.order_by("username"),
+        "ai_uses_left": uses_left(user),
+        "ai_limit": settings.AI_DAILY_LIMIT,
     }
     context.update(forms)
     return render(request, "accounts/settings.html", context)

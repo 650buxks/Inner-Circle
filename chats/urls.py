@@ -19,6 +19,7 @@ urlpatterns = [
     path("groups/new/", views.new_group, name="new_group"),
     path("<int:pk>/settings/", views.group_settings, name="group_settings"),
     path("<int:pk>/rename/", views.rename, name="rename"),
+    path("<int:pk>/ai/", views.ai_switch, name="ai_switch"),
     path("<int:pk>/add/", views.add_people, name="add_members"),
     path(
         "<int:pk>/remove/<str:username>/",

@@ -13,12 +13,15 @@ from django.utils import timezone
 
 from chats.models import Message
 from chats.services import (
+    ChatError,
+    create_group,
     delete_message,
     get_or_create_private_chat,
     mark_read,
     post_ai_message,
     preview,
     send_message,
+    set_ai_enabled,
 )
 
 from . import client as ai_client
@@ -31,6 +34,7 @@ from .services import (
     mentions_clique,
     parse_replies,
     suggest_replies,
+    uses_left,
     write_draft,
 )
 from .tasks import answer_mention
@@ -419,7 +423,7 @@ def test_reply_ideas_view_returns_json(logged_in, monkeypatch, chat):
 
     response = logged_in.post(reverse("chats:reply_ideas", args=[chat.pk]))
 
-    assert response.json() == {"replies": ["Sure!", "Nah"]}
+    assert response.json()["replies"] == ["Sure!", "Nah"]
 
 
 def test_reply_ideas_view_reports_errors(logged_in, chat):
@@ -649,7 +653,7 @@ def test_draft_view_returns_json(logged_in, monkeypatch, chat):
         {"request": "say no", "draft": "nah"},
     )
 
-    assert response.json() == {"draft": "Can't make it, sorry!"}
+    assert response.json()["draft"] == "Can't make it, sorry!"
     assert calls == [("say no", "nah")]
 
 
@@ -667,3 +671,127 @@ def test_outsiders_cannot_get_drafts(client, chat):
     response = client.post(reverse("chats:draft", args=[chat.pk]), {"request": "hi"})
 
     assert response.status_code == 404
+
+
+# --- AI settings and limits ----------------------------------------------
+
+
+def test_uses_left_counts_down(claude, settings, chat, francis, jordan):
+    settings.AI_DAILY_LIMIT = 3
+    send_message(jordan, chat, "Hi")
+    assert uses_left(francis) == 3
+
+    suggest_replies(francis, chat)
+
+    assert uses_left(francis) == 2
+
+
+def test_uses_left_never_goes_below_zero(settings, francis):
+    settings.AI_DAILY_LIMIT = 1
+    for _ in range(2):
+        AIRequest.objects.create(user=francis, feature=AIRequest.Feature.REPLY)
+
+    assert uses_left(francis) == 0
+
+
+def test_chat_page_shows_uses_left(logged_in, settings, chat):
+    settings.AI_DAILY_LIMIT = 30
+
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk])).content.decode()
+
+    assert "of 30 AI uses left today" in page
+
+
+def test_settings_page_shows_uses_left(logged_in, settings):
+    settings.AI_DAILY_LIMIT = 30
+
+    page = logged_in.get(reverse("accounts:settings")).content.decode()
+
+    assert "30 of 30 Clique AI uses left today" in page
+
+
+def test_ai_answers_include_uses_left(logged_in, monkeypatch, chat):
+    monkeypatch.setattr("chats.views.suggest_replies", lambda user, conversation: ["Hi"])
+
+    response = logged_in.post(reverse("chats:reply_ideas", args=[chat.pk]))
+
+    assert "uses_left" in response.json()
+
+
+def test_smart_replies_switch_hides_the_button(logged_in, chat, francis):
+    francis.smart_replies_on = False
+    francis.save()
+
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk])).content.decode()
+
+    assert "Help me reply" not in page
+    assert "Write it for me" in page  # only smart replies are turned off
+
+
+def test_smart_replies_switch_blocks_suggestions(claude, chat, francis, jordan):
+    send_message(jordan, chat, "Hi")
+    francis.smart_replies_on = False
+    francis.save()
+
+    with pytest.raises(AIError, match="turned off in your settings"):
+        suggest_replies(francis, chat)
+    assert claude.sent is None
+
+
+@pytest.fixture
+def group(francis, jordan):
+    return create_group(francis, "Trip", [jordan])  # francis is the admin
+
+
+def test_admin_turns_ai_off_for_the_group(logged_in, group, francis):
+    response = logged_in.post(reverse("chats:ai_switch", args=[group.pk]), {"on": "0"})
+
+    group.refresh_from_db()
+    assert response.status_code == 302
+    assert group.ai_enabled is False
+    assert group.messages.last().body == "francis turned Clique AI off"
+
+
+def test_admin_turns_ai_back_on(logged_in, group):
+    group.ai_enabled = False
+    group.save()
+
+    logged_in.post(reverse("chats:ai_switch", args=[group.pk]), {"on": "1"})
+
+    group.refresh_from_db()
+    assert group.ai_enabled is True
+    assert group.messages.last().body == "francis turned Clique AI on"
+
+
+def test_members_cannot_switch_ai(client, group, jordan):
+    client.force_login(jordan)
+
+    response = client.post(reverse("chats:ai_switch", args=[group.pk]), {"on": "0"}, follow=True)
+
+    group.refresh_from_db()
+    assert group.ai_enabled is True
+    assert "Only group admins" in response.content.decode()
+
+
+def test_switching_to_the_same_state_adds_no_message(group, francis):
+    before = group.messages.count()
+
+    set_ai_enabled(francis, group, True)
+
+    assert group.messages.count() == before
+
+
+def test_private_chats_have_no_ai_switch(chat, francis):
+    with pytest.raises(ChatError, match="Only group chats"):
+        set_ai_enabled(francis, chat, False)
+
+
+def test_group_settings_show_ai_switch_to_admins(logged_in, client, group, jordan):
+    url = reverse("chats:group_settings", args=[group.pk])
+
+    assert "Turn off" in logged_in.get(url).content.decode()
+
+    client.force_login(jordan)
+    page = client.get(url).content.decode()
+    assert "Turn off" not in page
+    assert "✨ On" in page
