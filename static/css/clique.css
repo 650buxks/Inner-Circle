@@ -197,6 +197,13 @@ body {
   border-left: 4px solid var(--clique-purple);
 }
 
+/* Answers from Clique AI (after an @clique question). */
+.ai-bubble {
+  background: var(--bs-body-bg);
+  border: 1px solid var(--clique-purple);
+  border-left-width: 4px;
+}
+
 /* "Help me reply" suggestions: tap one to put it in the message box. */
 .reply-idea {
   border: 1px solid var(--clique-purple);

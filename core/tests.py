@@ -1,3 +1,5 @@
+import threading
+
 import cloudinary
 import cloudinary.uploader
 import pytest
@@ -5,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.urls import reverse
 
+from core.background import run_in_background
 from core.storage import CloudinaryStorage
 from core.tasks import ping
 from core.views import photo_storage
@@ -138,3 +141,41 @@ def test_menu_highlights_the_current_page(logged_in):
     page = response.content.decode()
     assert 'aria-current="page" href="/friends/"' in page
     assert 'aria-current="page" href="/chats/"' not in page
+
+
+class FakeTask:
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, *args):
+        self.calls.append(("ran", args))
+
+    def delay(self, *args):
+        self.calls.append(("queued", args))
+
+
+def test_background_jobs_go_to_celery(settings):
+    settings.CELERY_TASK_ALWAYS_EAGER = False
+    task = FakeTask()
+
+    run_in_background(task, 7)
+
+    assert task.calls == [("queued", (7,))]
+
+
+def test_background_jobs_use_a_thread_without_a_worker(settings, monkeypatch):
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+    threads = []
+    real_thread = threading.Thread
+
+    def remember_thread(**kwargs):
+        threads.append(real_thread(**kwargs))
+        return threads[-1]
+
+    monkeypatch.setattr(threading, "Thread", remember_thread)
+    task = FakeTask()
+
+    run_in_background(task, 7)
+    threads[0].join(timeout=5)
+
+    assert task.calls == [("ran", (7,))]

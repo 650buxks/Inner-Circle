@@ -73,7 +73,7 @@
                accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm">
     </label>
     <textarea name="body" class="form-control" rows="1" maxlength="{{ max_length }}"
-              placeholder="Message {{ title }}" autofocus></textarea>
+              placeholder="{% if chat.ai_enabled %}Message, or @clique to ask AI{% else %}Message {{ title }}{% endif %}" autofocus></textarea>
     <button type="submit" class="btn btn-primary">Send</button>
   </form>
   <div id="attachment-chosen" class="small text-body-secondary mt-1"></div>

@@ -10,7 +10,9 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from ai.services import mentions_clique
 from core import uploads
+from core.background import run_in_background
 from friends.services import are_friends, is_blocked_between
 
 from .models import Conversation, Membership, Message
@@ -72,6 +74,8 @@ def preview(message, user):
         return "Message deleted"
     if message.kind == Message.Kind.SYSTEM:
         return message.body
+    if message.kind == Message.Kind.AI:
+        return f"✨ Clique AI: {message.body}"
     text = message.body
     if message.photo:
         text = f"📷 {text}" if text else "📷 Photo"
@@ -329,7 +333,23 @@ def send_message(user, conversation, body, photo=None, video=None):
         error = f"Couldn't upload your {kind}. Please try again."
         raise ChatError(error) from None
     mark_read(user, conversation)
+    if conversation.ai_enabled and mentions_clique(body):
+        # Imported here, not at the top: ai.tasks imports this file.
+        from ai.tasks import answer_mention
+
+        # After saving, so the question shows up before the answer.
+        transaction.on_commit(lambda: run_in_background(answer_mention, message.pk))
     return message
+
+
+def post_ai_message(conversation, body):
+    """Post a "Clique AI" message in the chat."""
+    return _save_message(
+        conversation,
+        sender=None,
+        body=body,
+        kind=Message.Kind.AI,
+    )
 
 
 def _save_message(

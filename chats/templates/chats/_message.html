@@ -3,7 +3,7 @@
 {% else %}
   <div id="message-{{ message.pk }}" class="mb-3 {% if message.sender == user %}text-end{% endif %}">
     <div class="small text-body-secondary">
-      {{ message.sender_name }} · {{ message.created_at|time:"g:i A" }}
+      {% if message.kind == "ai" %}✨ {% endif %}{{ message.sender_name }} · {{ message.created_at|time:"g:i A" }}
       {% if message.edited_at and not message.is_deleted %}· edited{% endif %}
     </div>
     {% if message.is_deleted %}
@@ -22,7 +22,7 @@
         </div>
       {% endif %}
       {% if message.body %}
-        <div class="d-inline-block px-3 py-2 rounded-3 text-start {% if message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
+        <div class="d-inline-block px-3 py-2 rounded-3 text-start {% if message.kind == "ai" %}ai-bubble{% elif message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
       {% endif %}
       {% if message.sender == user and message.kind == "text" %}
         <div class="small">
