@@ -22,7 +22,7 @@ from chats.services import (
 from . import client as ai_client
 from .client import AIError, ask_claude
 from .models import AIRequest
-from .services import catch_up, chat_transcript
+from .services import catch_up, chat_transcript, parse_replies, suggest_replies
 
 User = get_user_model()
 
@@ -314,5 +314,120 @@ def test_outsiders_cannot_catch_up(client, chat):
 
 def test_catch_up_needs_post(logged_in, chat):
     response = logged_in.get(reverse("chats:catch_up", args=[chat.pk]))
+
+    assert response.status_code == 405
+
+
+# --- Help me reply -------------------------------------------------------
+
+
+def test_suggest_replies_returns_ideas_and_records_usage(claude, chat, francis, jordan):
+    claude.reply = "Yes! 7pm works\nWhere should we go?\nOnly if you pay 😏"
+    send_message(francis, chat, "lol same")
+    send_message(jordan, chat, "Dinner Friday?")
+
+    replies = suggest_replies(francis, chat)
+
+    assert replies == ["Yes! 7pm works", "Where should we go?", "Only if you pay 😏"]
+    prompt = claude.sent["messages"][0]["content"]
+    assert "jordan: Dinner Friday?" in prompt
+    assert "francis: lol same" in prompt  # their own style counts
+    assert "write" in claude.sent["system"].lower()
+    request = AIRequest.objects.get()
+    assert request.feature == AIRequest.Feature.REPLY
+
+
+def test_suggest_replies_only_reads_recent_messages(claude, chat, francis, jordan):
+    send_message(jordan, chat, "Ancient history")
+    for number in range(30):
+        send_message(jordan, chat, f"message {number}")
+
+    suggest_replies(francis, chat)
+
+    prompt = claude.sent["messages"][0]["content"]
+    assert "message 29" in prompt
+    assert "Ancient history" not in prompt
+
+
+def test_suggest_replies_needs_something_to_reply_to(claude, chat, francis):
+    send_message(francis, chat, "Anyone there?")
+
+    with pytest.raises(AIError, match="nothing to reply to"):
+        suggest_replies(francis, chat)
+    assert claude.sent is None
+
+
+def test_suggest_replies_respects_chats_with_ai_off(claude, chat, francis, jordan):
+    send_message(jordan, chat, "Hi")
+    chat.ai_enabled = False
+    chat.save()
+
+    with pytest.raises(AIError, match="turned off"):
+        suggest_replies(francis, chat)
+
+
+def test_suggest_replies_counts_toward_daily_limit(claude, settings, chat, francis, jordan):
+    settings.AI_DAILY_LIMIT = 1
+    send_message(jordan, chat, "Hi")
+    suggest_replies(francis, chat)
+
+    with pytest.raises(AIError, match="1 times today"):
+        catch_up(francis, chat, an_hour_ago())
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("- Sure\n- Nope", ["Sure", "Nope"]),
+        ("1. Sure\n2) Nope\n\n3. Maybe", ["Sure", "Nope", "Maybe"]),
+        ('"Sure"\n"Sure"\n7pm works', ["Sure", "7pm works"]),
+        ("a\nb\nc\nd", ["a", "b", "c"]),
+    ],
+)
+def test_parse_replies_tidies_claudes_answer(text, expected):
+    assert parse_replies(text) == expected
+
+
+def test_reply_ideas_button_shows_in_chats(logged_in, chat):
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    assert "Help me reply" in page.content.decode()
+
+
+def test_no_reply_ideas_button_when_ai_is_off(logged_in, chat):
+    chat.ai_enabled = False
+    chat.save()
+
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    assert "Help me reply" not in page.content.decode()
+
+
+def test_reply_ideas_view_returns_json(logged_in, monkeypatch, chat):
+    monkeypatch.setattr("chats.views.suggest_replies", lambda user, conversation: ["Sure!", "Nah"])
+
+    response = logged_in.post(reverse("chats:reply_ideas", args=[chat.pk]))
+
+    assert response.json() == {"replies": ["Sure!", "Nah"]}
+
+
+def test_reply_ideas_view_reports_errors(logged_in, chat):
+    response = logged_in.post(reverse("chats:reply_ideas", args=[chat.pk]))
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "There's nothing to reply to yet."}
+
+
+def test_outsiders_cannot_get_reply_ideas(client, chat):
+    outsider = User.objects.create_user(username="sam", password="pass")
+    client.force_login(outsider)
+
+    response = client.post(reverse("chats:reply_ideas", args=[chat.pk]))
+
+    assert response.status_code == 404
+
+
+def test_reply_ideas_needs_post(logged_in, chat):
+    response = logged_in.get(reverse("chats:reply_ideas", args=[chat.pk]))
 
     assert response.status_code == 405

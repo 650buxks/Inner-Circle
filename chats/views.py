@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 from accounts.models import User
 from ai.client import AIError
 from ai.services import catch_up as summarize_missed
+from ai.services import suggest_replies
 
 from .forms import AddMembersForm, GroupForm
 from .models import Conversation, Message
@@ -135,6 +136,18 @@ def catch_up(request, pk):
         "summary": summary,
     }
     return render(request, "chats/catch_up.html", context)
+
+
+@login_required
+@require_POST
+def reply_ideas(request, pk):
+    """Reply suggestions for the "Help me reply" button, as JSON."""
+    chat = get_chat_for(request.user, pk)
+    try:
+        replies = suggest_replies(request.user, chat)
+    except AIError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    return JsonResponse({"replies": replies})
 
 
 @login_required
