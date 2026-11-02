@@ -204,6 +204,15 @@ body {
   border-left-width: 4px;
 }
 
+/* The message box grows with longer messages, up to about 6 lines. */
+#send {
+  align-items: flex-end; /* keep the buttons small when it grows */
+}
+
+#send textarea {
+  max-height: 10rem;
+}
+
 /* "Help me reply" suggestions: tap one to put it in the message box. */
 .reply-idea {
   border: 1px solid var(--clique-purple);

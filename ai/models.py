@@ -10,6 +10,7 @@ class AIRequest(models.Model):
         CATCH_UP = "catch_up", "Catch me up"
         REPLY = "reply", "Help me reply"
         MENTION = "mention", "@clique"
+        DRAFT = "draft", "Write it for me"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

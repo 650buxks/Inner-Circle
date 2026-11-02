@@ -31,6 +31,7 @@ from .services import (
     mentions_clique,
     parse_replies,
     suggest_replies,
+    write_draft,
 )
 from .tasks import answer_mention
 
@@ -580,3 +581,89 @@ def test_inbox_preview_of_ai_message(chat, francis):
     message = post_ai_message(chat, "Friday at 7!")
 
     assert preview(message, francis) == "✨ Clique AI: Friday at 7!"
+
+
+# --- Write it for me -----------------------------------------------------
+
+
+def test_write_draft_follows_the_request(claude, chat, francis, jordan):
+    claude.reply = '"Ah I cant Saturday, busy! Next week?"'
+    send_message(jordan, chat, "Hiking Saturday?")
+
+    text = write_draft(francis, chat, "say no politely, I'm busy")
+
+    assert text == "Ah I cant Saturday, busy! Next week?"  # quotes removed
+    prompt = claude.sent["messages"][0]["content"]
+    assert "jordan: Hiking Saturday?" in prompt
+    assert "<request>\nsay no politely, I'm busy\n</request>" in prompt
+    assert "<draft>" not in prompt
+    assert AIRequest.objects.get().feature == AIRequest.Feature.DRAFT
+
+
+def test_write_draft_rewrites_what_you_typed(claude, chat, francis):
+    write_draft(francis, chat, "make this less awkward", draft="um so hi")
+
+    prompt = claude.sent["messages"][0]["content"]
+    assert "<draft>\num so hi\n</draft>" in prompt
+
+
+def test_write_draft_works_in_a_new_chat(claude, chat, francis):
+    assert write_draft(francis, chat, "say hi") == "- Jordan booked dinner for Friday"
+
+
+@pytest.mark.parametrize(
+    "request_text, error",
+    [("   ", "Say what you'd like"), ("x" * 301, "under 300 characters")],
+)
+def test_write_draft_checks_the_request(claude, chat, francis, request_text, error):
+    with pytest.raises(AIError, match=error):
+        write_draft(francis, chat, request_text)
+    assert claude.sent is None
+
+
+def test_write_draft_respects_chats_with_ai_off(claude, chat, francis):
+    chat.ai_enabled = False
+    chat.save()
+
+    with pytest.raises(AIError, match="turned off"):
+        write_draft(francis, chat, "say hi")
+
+
+def test_write_it_for_me_button_shows(logged_in, chat):
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+
+    assert "Write it for me" in page.content.decode()
+
+
+def test_draft_view_returns_json(logged_in, monkeypatch, chat):
+    calls = []
+
+    def fake_write(user, conversation, request, draft):
+        calls.append((request, draft))
+        return "Can't make it, sorry!"
+
+    monkeypatch.setattr("chats.views.write_draft", fake_write)
+
+    response = logged_in.post(
+        reverse("chats:draft", args=[chat.pk]),
+        {"request": "say no", "draft": "nah"},
+    )
+
+    assert response.json() == {"draft": "Can't make it, sorry!"}
+    assert calls == [("say no", "nah")]
+
+
+def test_draft_view_reports_errors(logged_in, chat):
+    response = logged_in.post(reverse("chats:draft", args=[chat.pk]), {"request": ""})
+
+    assert response.status_code == 400
+    assert "Say what you'd like" in response.json()["error"]
+
+
+def test_outsiders_cannot_get_drafts(client, chat):
+    outsider = User.objects.create_user(username="sam", password="pass")
+    client.force_login(outsider)
+
+    response = client.post(reverse("chats:draft", args=[chat.pk]), {"request": "hi"})
+
+    assert response.status_code == 404

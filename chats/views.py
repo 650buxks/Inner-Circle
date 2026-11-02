@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 from accounts.models import User
 from ai.client import AIError
 from ai.services import catch_up as summarize_missed
-from ai.services import suggest_replies
+from ai.services import suggest_replies, write_draft
 
 from .forms import AddMembersForm, GroupForm
 from .models import Conversation, Message
@@ -148,6 +148,23 @@ def reply_ideas(request, pk):
     except AIError as error:
         return JsonResponse({"error": str(error)}, status=400)
     return JsonResponse({"replies": replies})
+
+
+@login_required
+@require_POST
+def draft(request, pk):
+    """A message written by Clique AI for "Write it for me", as JSON."""
+    chat = get_chat_for(request.user, pk)
+    try:
+        text = write_draft(
+            request.user,
+            chat,
+            request.POST.get("request", ""),
+            request.POST.get("draft", ""),
+        )
+    except AIError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    return JsonResponse({"draft": text})
 
 
 @login_required
