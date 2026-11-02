@@ -54,6 +54,16 @@
   <div id="typing" class="small text-body-secondary fst-italic"></div>
   <div id="chat-error" class="alert alert-danger d-none"></div>
 
+  {% if chat.ai_enabled %}
+    {# Hidden until reply-ideas.js loads, since it needs JavaScript. #}
+    <div id="reply-ideas" class="d-none mt-3"
+         data-url="{% url 'chats:reply_ideas' chat.pk %}">
+      <button type="button" id="reply-ideas-button" class="btn btn-outline-primary btn-sm">
+        ✨ Help me reply
+      </button>
+      <div id="reply-ideas-list" class="d-flex flex-wrap gap-2 mt-2"></div>
+    </div>
+  {% endif %}
   <form method="post" action="{% url 'chats:send' chat.pk %}" id="send" class="d-flex gap-2 mt-4"
         enctype="multipart/form-data"
         {% if live %}data-socket-url="/ws/chats/{{ chat.pk }}/"{% endif %}>
@@ -71,4 +81,5 @@
 </div>
 
 <script src="{% static 'js/chat.js' %}"></script>
+<script src="{% static 'js/reply-ideas.js' %}"></script>
 {% endblock %}
