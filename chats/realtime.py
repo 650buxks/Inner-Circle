@@ -58,6 +58,12 @@ def broadcast_read(conversation_id, user_id):
     update_inboxes([user_id], conversation_id)
 
 
+def show_ai_thinking(conversation_id):
+    """Show "Clique AI is typing…" while it works on an answer."""
+    event = {"type": "user.typing", "user_id": None, "name": "Clique AI"}
+    _send(group_name(conversation_id), event)
+
+
 def update_inboxes(user_ids, conversation_id, to_top=False):
     """Ask these people's open inboxes to redraw one chat's row."""
     event = {

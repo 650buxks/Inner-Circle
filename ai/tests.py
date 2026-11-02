@@ -16,13 +16,23 @@ from chats.services import (
     delete_message,
     get_or_create_private_chat,
     mark_read,
+    post_ai_message,
+    preview,
     send_message,
 )
 
 from . import client as ai_client
 from .client import AIError, ask_claude
 from .models import AIRequest
-from .services import catch_up, chat_transcript, parse_replies, suggest_replies
+from .services import (
+    ask_clique,
+    catch_up,
+    chat_transcript,
+    mentions_clique,
+    parse_replies,
+    suggest_replies,
+)
+from .tasks import answer_mention
 
 User = get_user_model()
 
@@ -431,3 +441,142 @@ def test_reply_ideas_needs_post(logged_in, chat):
     response = logged_in.get(reverse("chats:reply_ideas", args=[chat.pk]))
 
     assert response.status_code == 405
+
+
+# --- @clique -------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("@clique what time?", True),
+        ("hey @CLIQUE, what time?", True),
+        ("ok @clique.", True),
+        ("email me at me@clique.com", False),
+        ("@cliquey", False),
+        ("clique is great", False),
+    ],
+)
+def test_mentions_clique(text, expected):
+    assert mentions_clique(text) == expected
+
+
+def test_ask_clique_reads_earlier_messages(claude, chat, francis, jordan):
+    claude.reply = "You agreed on 7pm at Ramen Ya."
+    send_message(jordan, chat, "7pm at Ramen Ya?")
+    question = send_message(francis, chat, "@clique what time did we agree on?")
+    send_message(jordan, chat, "Later message")
+
+    answer = ask_clique(francis, question)
+
+    assert answer == "You agreed on 7pm at Ramen Ya."
+    prompt = claude.sent["messages"][0]["content"]
+    assert "jordan: 7pm at Ramen Ya?" in prompt
+    assert "<question>\n@clique what time did we agree on?\n</question>" in prompt
+    assert "Later message" not in prompt
+    assert AIRequest.objects.get().feature == AIRequest.Feature.MENTION
+
+
+def test_ask_clique_respects_chats_with_ai_off(claude, chat, francis):
+    question = send_message(francis, chat, "@clique hi")
+    chat.ai_enabled = False
+    chat.save()
+
+    with pytest.raises(AIError, match="turned off"):
+        ask_clique(francis, question)
+
+
+@pytest.fixture
+def no_live_updates(monkeypatch):
+    """Skip "Clique AI is typing…", which needs open chat pages."""
+    monkeypatch.setattr("ai.tasks.show_ai_thinking", lambda chat_id: None)
+
+
+def test_answer_mention_posts_an_ai_message(claude, no_live_updates, chat, francis):
+    claude.reply = "Sounds like Friday!"
+    question = send_message(francis, chat, "@clique when?")
+
+    answer_mention(question.pk)
+
+    answer = chat.messages.last()
+    assert answer.kind == Message.Kind.AI
+    assert answer.sender is None
+    assert answer.sender_name == "Clique AI"
+    assert answer.body == "Sounds like Friday!"
+
+
+def test_answer_mention_explains_problems_in_the_chat(no_live_updates, settings, chat, francis):
+    settings.ANTHROPIC_API_KEY = ""
+    question = send_message(francis, chat, "@clique when?")
+
+    answer_mention(question.pk)
+
+    assert chat.messages.last().body == "Clique AI isn't set up yet."
+
+
+def test_answer_mention_survives_unexpected_errors(claude, no_live_updates, chat, francis, caplog):
+    claude.error = ValueError("surprise")
+    question = send_message(francis, chat, "@clique when?")
+
+    answer_mention(question.pk)
+
+    assert "ran into a problem" in chat.messages.last().body
+    assert "@clique answer failed" in caplog.text
+
+
+def test_answer_mention_skips_deleted_questions(claude, no_live_updates, chat, francis):
+    question = send_message(francis, chat, "@clique when?")
+    delete_message(francis, question)
+
+    answer_mention(question.pk)
+
+    assert claude.sent is None
+    assert not chat.messages.filter(kind=Message.Kind.AI).exists()
+
+
+@pytest.fixture
+def background(monkeypatch):
+    """Records background jobs instead of running them."""
+    jobs = []
+    monkeypatch.setattr(
+        "chats.services.run_in_background", lambda task, *args: jobs.append((task, args))
+    )
+    return jobs
+
+
+def test_mentioning_clique_starts_an_answer(
+    background, django_capture_on_commit_callbacks, chat, francis
+):
+    with django_capture_on_commit_callbacks(execute=True):
+        question = send_message(francis, chat, "@clique what's the plan?")
+
+    assert background == [(answer_mention, (question.pk,))]
+
+
+@pytest.mark.parametrize("text, ai_on", [("no mention here", True), ("@clique hi", False)])
+def test_no_answer_without_mention_or_with_ai_off(
+    background, django_capture_on_commit_callbacks, chat, francis, text, ai_on
+):
+    chat.ai_enabled = ai_on
+    chat.save()
+
+    with django_capture_on_commit_callbacks(execute=True):
+        send_message(francis, chat, text)
+
+    assert background == []
+
+
+def test_ai_messages_look_different(logged_in, chat):
+    post_ai_message(chat, "Friday at 7!")
+
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk])).content.decode()
+
+    assert "✨ Clique AI" in page
+    assert "ai-bubble" in page
+    assert "Edit</a>" not in page  # nobody can edit Clique AI's messages
+
+
+def test_inbox_preview_of_ai_message(chat, francis):
+    message = post_ai_message(chat, "Friday at 7!")
+
+    assert preview(message, francis) == "✨ Clique AI: Friday at 7!"
