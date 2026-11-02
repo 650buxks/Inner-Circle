@@ -57,11 +57,22 @@
   {% if chat.ai_enabled %}
     {# Hidden until reply-ideas.js loads, since it needs JavaScript. #}
     <div id="reply-ideas" class="d-none mt-3"
-         data-url="{% url 'chats:reply_ideas' chat.pk %}">
-      <button type="button" id="reply-ideas-button" class="btn btn-outline-primary btn-sm">
-        ✨ Help me reply
-      </button>
+         data-url="{% url 'chats:reply_ideas' chat.pk %}"
+         data-draft-url="{% url 'chats:draft' chat.pk %}">
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" id="reply-ideas-button" class="btn btn-outline-primary btn-sm">
+          ✨ Help me reply
+        </button>
+        <button type="button" id="write-toggle" class="btn btn-outline-primary btn-sm">
+          ✍️ Write it for me
+        </button>
+      </div>
       <div id="reply-ideas-list" class="d-flex flex-wrap gap-2 mt-2"></div>
+      <div id="write-box" class="d-none d-flex gap-2 mt-2">
+        <input type="text" id="write-request" class="form-control form-control-sm" maxlength="300"
+               placeholder="What should it say? e.g. say no politely, I'm busy Saturday">
+        <button type="button" id="write-button" class="btn btn-primary btn-sm text-nowrap">Write</button>
+      </div>
     </div>
   {% endif %}
   <form method="post" action="{% url 'chats:send' chat.pk %}" id="send" class="d-flex gap-2 mt-4"
