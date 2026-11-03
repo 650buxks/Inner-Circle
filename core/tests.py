@@ -4,6 +4,7 @@ import cloudinary
 import cloudinary.uploader
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.staticfiles import finders
 from django.core.files.base import ContentFile
 from django.urls import reverse
 
@@ -194,3 +195,9 @@ def test_background_jobs_use_a_thread_without_a_worker(settings, monkeypatch):
     threads[0].join(timeout=5)
 
     assert task.calls == [("ran", (7,))]
+
+
+@pytest.mark.parametrize("path", ["js/chat.js", "js/inbox.js", "js/ai-tools.js", "css/clique.css"])
+def test_static_files_exist(path):
+    # Pages load these files; a missing one silently breaks the page.
+    assert finders.find(path), f"static/{path} is missing"
