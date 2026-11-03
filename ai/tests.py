@@ -31,11 +31,10 @@ from .services import (
     ask_clique,
     catch_up,
     chat_transcript,
+    image_blocks,
     mentions_clique,
-    parse_replies,
-    suggest_replies,
     uses_left,
-    write_draft,
+    write_reply,
 )
 from .tasks import answer_mention
 
@@ -333,117 +332,193 @@ def test_catch_up_needs_post(logged_in, chat):
     assert response.status_code == 405
 
 
-# --- Help me reply -------------------------------------------------------
+# --- Write it for me (one tap) ------------------------------------------
 
 
-def test_suggest_replies_returns_ideas_and_records_usage(claude, chat, francis, jordan):
-    claude.reply = "Yes! 7pm works\nWhere should we go?\nOnly if you pay 😏"
+def test_write_reply_reads_the_chat_and_records_usage(claude, chat, francis, jordan):
+    claude.reply = '"Yes!! Friday works 🙌"'
     send_message(francis, chat, "lol same")
     send_message(jordan, chat, "Dinner Friday?")
 
-    replies = suggest_replies(francis, chat)
+    reply = write_reply(francis, chat)
 
-    assert replies == ["Yes! 7pm works", "Where should we go?", "Only if you pay 😏"]
-    prompt = claude.sent["messages"][0]["content"]
+    assert reply == "Yes!! Friday works 🙌"  # quotes removed
+    blocks = claude.sent["messages"][0]["content"]
+    prompt = blocks[-1]["text"]
     assert "jordan: Dinner Friday?" in prompt
     assert "francis: lol same" in prompt  # their own style counts
-    assert "write" in claude.sent["system"].lower()
-    request = AIRequest.objects.get()
-    assert request.feature == AIRequest.Feature.REPLY
+    assert "<previous>" not in prompt
+    assert AIRequest.objects.get().feature == AIRequest.Feature.DRAFT
 
 
-def test_suggest_replies_only_reads_recent_messages(claude, chat, francis, jordan):
+def test_tapping_again_asks_for_something_different(claude, chat, francis, jordan):
+    send_message(jordan, chat, "Dinner Friday?")
+
+    write_reply(francis, chat, previous="Sure!")
+
+    prompt = claude.sent["messages"][0]["content"][-1]["text"]
+    assert "<previous>\nSure!\n</previous>" in prompt
+
+
+def test_write_reply_only_reads_recent_messages(claude, chat, francis, jordan):
     send_message(jordan, chat, "Ancient history")
     for number in range(30):
         send_message(jordan, chat, f"message {number}")
 
-    suggest_replies(francis, chat)
+    write_reply(francis, chat)
 
-    prompt = claude.sent["messages"][0]["content"]
+    prompt = claude.sent["messages"][0]["content"][-1]["text"]
     assert "message 29" in prompt
     assert "Ancient history" not in prompt
 
 
-def test_suggest_replies_needs_something_to_reply_to(claude, chat, francis):
+def test_write_reply_needs_something_to_reply_to(claude, chat, francis):
     send_message(francis, chat, "Anyone there?")
 
     with pytest.raises(AIError, match="nothing to reply to"):
-        suggest_replies(francis, chat)
+        write_reply(francis, chat)
     assert claude.sent is None
 
 
-def test_suggest_replies_respects_chats_with_ai_off(claude, chat, francis, jordan):
+def test_write_reply_respects_chats_with_ai_off(claude, chat, francis, jordan):
     send_message(jordan, chat, "Hi")
     chat.ai_enabled = False
     chat.save()
 
-    with pytest.raises(AIError, match="turned off"):
-        suggest_replies(francis, chat)
+    with pytest.raises(AIError, match="turned off in this chat"):
+        write_reply(francis, chat)
 
 
-def test_suggest_replies_counts_toward_daily_limit(claude, settings, chat, francis, jordan):
+def test_write_reply_counts_toward_daily_limit(claude, settings, chat, francis, jordan):
     settings.AI_DAILY_LIMIT = 1
     send_message(jordan, chat, "Hi")
-    suggest_replies(francis, chat)
+    write_reply(francis, chat)
 
     with pytest.raises(AIError, match="1 times today"):
         catch_up(francis, chat, an_hour_ago())
 
 
-@pytest.mark.parametrize(
-    "text, expected",
-    [
-        ("- Sure\n- Nope", ["Sure", "Nope"]),
-        ("1. Sure\n2) Nope\n\n3. Maybe", ["Sure", "Nope", "Maybe"]),
-        ('"Sure"\n"Sure"\n7pm works', ["Sure", "7pm works"]),
-        ("a\nb\nc\nd", ["a", "b", "c"]),
-    ],
-)
-def test_parse_replies_tidies_claudes_answer(text, expected):
-    assert parse_replies(text) == expected
+class FakeStorage:
+    """Pretends to be Cloudinary: every file has a public preview."""
+
+    def preview_url(self, name):
+        return f"https://cdn.example/{name}.jpg"
 
 
-def test_reply_ideas_button_shows_in_chats(logged_in, chat):
-    page = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+def with_file(message, field, name, storage):
+    getattr(message, field).name = name
+    getattr(message, field).storage = storage
+    return message
 
-    assert "Help me reply" in page.content.decode()
+
+def test_image_blocks_take_the_latest_photos_and_video_frames(chat, jordan):
+    storage = FakeStorage()
+    messages = [
+        with_file(send_message(jordan, chat, f"pic {n}"), "photo", f"p{n}", storage)
+        for n in range(3)
+    ]
+    messages.append(with_file(send_message(jordan, chat, "clip"), "video", "v1", storage))
+    messages.append(send_message(jordan, chat, "just text"))
+
+    blocks = image_blocks(messages)
+
+    urls = [block["source"]["url"] for block in blocks]
+    assert urls == [  # the newest 3, oldest first
+        "https://cdn.example/p1.jpg",
+        "https://cdn.example/p2.jpg",
+        "https://cdn.example/v1.jpg",
+    ]
+    assert blocks[0] == {"type": "image", "source": {"type": "url", "url": urls[0]}}
 
 
-def test_no_reply_ideas_button_when_ai_is_off(logged_in, chat):
+def test_image_blocks_skip_local_files(chat, jordan):
+    message = send_message(jordan, chat, "Look")
+    message.photo.name = "chats/1/cat.png"  # stored on this server's disk
+
+    assert image_blocks([message]) == []  # Claude can't reach local files
+
+
+def test_write_reply_sends_photos_to_claude(claude, monkeypatch, chat, francis, jordan):
+    send_message(jordan, chat, "Look at this squat")
+    image = {"type": "image", "source": {"type": "url", "url": "https://x/p.jpg"}}
+    monkeypatch.setattr("ai.services.image_blocks", lambda messages: [image])
+
+    write_reply(francis, chat)
+
+    blocks = claude.sent["messages"][0]["content"]
+    assert blocks[0] == image
+    assert blocks[-1]["type"] == "text"
+
+
+def test_write_reply_retries_without_photos(claude, monkeypatch, chat, francis, jordan):
+    send_message(jordan, chat, "Look")
+    image = {"type": "image", "source": {"type": "url", "url": "https://x/p.jpg"}}
+    monkeypatch.setattr("ai.services.image_blocks", lambda messages: [image])
+    calls = []
+
+    def fake_ask(system, prompt):
+        calls.append(prompt)
+        if len(calls) == 1:
+            raise AIError("Clique AI isn't available right now.")
+        return "Nice!", SimpleNamespace(input_tokens=1, output_tokens=1)
+
+    monkeypatch.setattr("ai.services.ask_claude", fake_ask)
+
+    assert write_reply(francis, chat) == "Nice!"
+    assert isinstance(calls[1], str)  # the retry is text only
+
+
+def test_write_it_for_me_button_shows(logged_in, chat):
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk])).content.decode()
+
+    assert "Write it for me" in page
+    assert "Help me reply" in page
+
+
+def test_no_ai_buttons_when_ai_is_off(logged_in, chat):
     chat.ai_enabled = False
     chat.save()
 
-    page = logged_in.get(reverse("chats:detail", args=[chat.pk]))
+    page = logged_in.get(reverse("chats:detail", args=[chat.pk])).content.decode()
 
-    assert "Help me reply" not in page.content.decode()
-
-
-def test_reply_ideas_view_returns_json(logged_in, monkeypatch, chat):
-    monkeypatch.setattr("chats.views.suggest_replies", lambda user, conversation: ["Sure!", "Nah"])
-
-    response = logged_in.post(reverse("chats:reply_ideas", args=[chat.pk]))
-
-    assert response.json()["replies"] == ["Sure!", "Nah"]
+    assert "Write it for me" not in page
+    assert "Help me reply" not in page
 
 
-def test_reply_ideas_view_reports_errors(logged_in, chat):
-    response = logged_in.post(reverse("chats:reply_ideas", args=[chat.pk]))
+def test_write_view_returns_json(logged_in, monkeypatch, chat):
+    calls = []
+
+    def fake_write(user, conversation, previous):
+        calls.append(previous)
+        return "Count me in!"
+
+    monkeypatch.setattr("chats.views.write_reply", fake_write)
+
+    response = logged_in.post(reverse("chats:write_for_me", args=[chat.pk]), {"previous": "Nah"})
+
+    assert response.json()["draft"] == "Count me in!"
+    assert "uses_left" in response.json()
+    assert calls == ["Nah"]
+
+
+def test_write_view_reports_errors(logged_in, chat):
+    response = logged_in.post(reverse("chats:write_for_me", args=[chat.pk]))
 
     assert response.status_code == 400
     assert response.json() == {"error": "There's nothing to reply to yet."}
 
 
-def test_outsiders_cannot_get_reply_ideas(client, chat):
+def test_outsiders_cannot_use_write_it_for_me(client, chat):
     outsider = User.objects.create_user(username="sam", password="pass")
     client.force_login(outsider)
 
-    response = client.post(reverse("chats:reply_ideas", args=[chat.pk]))
+    response = client.post(reverse("chats:write_for_me", args=[chat.pk]))
 
     assert response.status_code == 404
 
 
-def test_reply_ideas_needs_post(logged_in, chat):
-    response = logged_in.get(reverse("chats:reply_ideas", args=[chat.pk]))
+def test_write_it_for_me_needs_post(logged_in, chat):
+    response = logged_in.get(reverse("chats:write_for_me", args=[chat.pk]))
 
     assert response.status_code == 405
 
@@ -587,92 +662,6 @@ def test_inbox_preview_of_ai_message(chat, francis):
     assert preview(message, francis) == "✨ Clique AI: Friday at 7!"
 
 
-# --- Write it for me -----------------------------------------------------
-
-
-def test_write_draft_follows_the_request(claude, chat, francis, jordan):
-    claude.reply = '"Ah I cant Saturday, busy! Next week?"'
-    send_message(jordan, chat, "Hiking Saturday?")
-
-    text = write_draft(francis, chat, "say no politely, I'm busy")
-
-    assert text == "Ah I cant Saturday, busy! Next week?"  # quotes removed
-    prompt = claude.sent["messages"][0]["content"]
-    assert "jordan: Hiking Saturday?" in prompt
-    assert "<request>\nsay no politely, I'm busy\n</request>" in prompt
-    assert "<draft>" not in prompt
-    assert AIRequest.objects.get().feature == AIRequest.Feature.DRAFT
-
-
-def test_write_draft_rewrites_what_you_typed(claude, chat, francis):
-    write_draft(francis, chat, "make this less awkward", draft="um so hi")
-
-    prompt = claude.sent["messages"][0]["content"]
-    assert "<draft>\num so hi\n</draft>" in prompt
-
-
-def test_write_draft_works_in_a_new_chat(claude, chat, francis):
-    assert write_draft(francis, chat, "say hi") == "- Jordan booked dinner for Friday"
-
-
-@pytest.mark.parametrize(
-    "request_text, error",
-    [("   ", "Say what you'd like"), ("x" * 301, "under 300 characters")],
-)
-def test_write_draft_checks_the_request(claude, chat, francis, request_text, error):
-    with pytest.raises(AIError, match=error):
-        write_draft(francis, chat, request_text)
-    assert claude.sent is None
-
-
-def test_write_draft_respects_chats_with_ai_off(claude, chat, francis):
-    chat.ai_enabled = False
-    chat.save()
-
-    with pytest.raises(AIError, match="turned off"):
-        write_draft(francis, chat, "say hi")
-
-
-def test_write_it_for_me_button_shows(logged_in, chat):
-    page = logged_in.get(reverse("chats:detail", args=[chat.pk]))
-
-    assert "Write it for me" in page.content.decode()
-
-
-def test_draft_view_returns_json(logged_in, monkeypatch, chat):
-    calls = []
-
-    def fake_write(user, conversation, request, draft):
-        calls.append((request, draft))
-        return "Can't make it, sorry!"
-
-    monkeypatch.setattr("chats.views.write_draft", fake_write)
-
-    response = logged_in.post(
-        reverse("chats:draft", args=[chat.pk]),
-        {"request": "say no", "draft": "nah"},
-    )
-
-    assert response.json()["draft"] == "Can't make it, sorry!"
-    assert calls == [("say no", "nah")]
-
-
-def test_draft_view_reports_errors(logged_in, chat):
-    response = logged_in.post(reverse("chats:draft", args=[chat.pk]), {"request": ""})
-
-    assert response.status_code == 400
-    assert "Say what you'd like" in response.json()["error"]
-
-
-def test_outsiders_cannot_get_drafts(client, chat):
-    outsider = User.objects.create_user(username="sam", password="pass")
-    client.force_login(outsider)
-
-    response = client.post(reverse("chats:draft", args=[chat.pk]), {"request": "hi"})
-
-    assert response.status_code == 404
-
-
 # --- AI settings and limits ----------------------------------------------
 
 
@@ -681,7 +670,7 @@ def test_uses_left_counts_down(claude, settings, chat, francis, jordan):
     send_message(jordan, chat, "Hi")
     assert uses_left(francis) == 3
 
-    suggest_replies(francis, chat)
+    write_reply(francis, chat)
 
     assert uses_left(francis) == 2
 
@@ -710,31 +699,23 @@ def test_settings_page_shows_uses_left(logged_in, settings):
     assert "30 of 30 Clique AI uses left today" in page
 
 
-def test_ai_answers_include_uses_left(logged_in, monkeypatch, chat):
-    monkeypatch.setattr("chats.views.suggest_replies", lambda user, conversation: ["Hi"])
-
-    response = logged_in.post(reverse("chats:reply_ideas", args=[chat.pk]))
-
-    assert "uses_left" in response.json()
-
-
 def test_smart_replies_switch_hides_the_button(logged_in, chat, francis):
     francis.smart_replies_on = False
     francis.save()
 
     page = logged_in.get(reverse("chats:detail", args=[chat.pk])).content.decode()
 
-    assert "Help me reply" not in page
-    assert "Write it for me" in page  # only smart replies are turned off
+    assert "Write it for me" not in page
+    assert "Help me reply" in page  # only the one-tap button is turned off
 
 
-def test_smart_replies_switch_blocks_suggestions(claude, chat, francis, jordan):
+def test_smart_replies_switch_blocks_write_it_for_me(claude, chat, francis, jordan):
     send_message(jordan, chat, "Hi")
     francis.smart_replies_on = False
     francis.save()
 
     with pytest.raises(AIError, match="turned off in your settings"):
-        suggest_replies(francis, chat)
+        write_reply(francis, chat)
     assert claude.sent is None
 
 

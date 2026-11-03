@@ -11,7 +11,7 @@ from accounts.models import User
 from ai.agent import run_agent
 from ai.client import AIError
 from ai.services import catch_up as summarize_missed
-from ai.services import suggest_replies, uses_left, write_draft
+from ai.services import uses_left, write_reply
 
 from .forms import AddMembersForm, GroupForm
 from .models import Conversation, Message
@@ -144,28 +144,11 @@ def catch_up(request, pk):
 
 @login_required
 @require_POST
-def reply_ideas(request, pk):
-    """Reply suggestions for the "Help me reply" button, as JSON."""
+def write_for_me(request, pk):
+    """A reply written by Clique AI, for the one-tap "Write it for me"."""
     chat = get_chat_for(request.user, pk)
     try:
-        replies = suggest_replies(request.user, chat)
-    except AIError as error:
-        return JsonResponse({"error": str(error)}, status=400)
-    return JsonResponse({"replies": replies, "uses_left": uses_left(request.user)})
-
-
-@login_required
-@require_POST
-def draft(request, pk):
-    """A message written by Clique AI for "Write it for me", as JSON."""
-    chat = get_chat_for(request.user, pk)
-    try:
-        text = write_draft(
-            request.user,
-            chat,
-            request.POST.get("request", ""),
-            request.POST.get("draft", ""),
-        )
+        text = write_reply(request.user, chat, request.POST.get("previous", ""))
     except AIError as error:
         return JsonResponse({"error": str(error)}, status=400)
     return JsonResponse({"draft": text, "uses_left": uses_left(request.user)})
@@ -303,8 +286,8 @@ def ai_switch(request, pk):
 
 @login_required
 @require_POST
-def agent(request, pk):
-    """The reply agent's draft and the steps it took, as JSON."""
+def help_me_reply(request, pk):
+    """The agent's draft or private answer, and the steps it took."""
     chat = get_chat_for(request.user, pk)
     try:
         result = run_agent(request.user, chat, request.POST.get("request", ""))
