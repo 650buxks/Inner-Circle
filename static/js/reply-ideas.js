@@ -2,6 +2,8 @@
 // - "Help me reply" shows a few replies as buttons. Tapping one puts it in
 //   the message box.
 // - "Write it for me" writes a message the way you ask ("say no politely").
+// - "Ask the agent" lets Clique AI look things up in the chat first
+//   ("help me answer Jordan about the trip"), and shows what it checked.
 // Nothing is ever sent for you: you can edit the text, then press Send.
 
 const ideas = document.getElementById("reply-ideas");
@@ -13,6 +15,11 @@ if (ideas) {
   const writeBox = document.getElementById("write-box");
   const writeRequest = document.getElementById("write-request");
   const writeButton = document.getElementById("write-button");
+  const agentToggle = document.getElementById("agent-toggle");
+  const agentBox = document.getElementById("agent-box");
+  const agentRequest = document.getElementById("agent-request");
+  const agentButton = document.getElementById("agent-button");
+  const agentSteps = document.getElementById("agent-steps");
   const textarea = document.querySelector("#send textarea");
   const csrfToken = document.querySelector("#send [name=csrfmiddlewaretoken]").value;
   const errorBox = document.getElementById("chat-error");
@@ -149,6 +156,47 @@ if (ideas) {
   // A new request starts over.
   writeRequest.addEventListener("input", () => {
     writeButton.textContent = "Write";
+  });
+
+  // --- Ask the agent ----------------------------------------------------
+
+  agentToggle.addEventListener("click", () => {
+    agentBox.classList.toggle("d-none");
+    if (!agentBox.classList.contains("d-none")) {
+      agentRequest.focus();
+      textarea.form.scrollIntoView({ block: "end" });
+    }
+  });
+
+  // Show what the agent looked up, e.g. "🔎 Searched the chat for “trip”".
+  function showSteps(steps) {
+    agentSteps.replaceChildren();
+    for (const step of steps) {
+      const item = document.createElement("li");
+      item.textContent = step; // textContent, so it can't add HTML
+      agentSteps.append(item);
+    }
+  }
+
+  function askAgent() {
+    return whileThinking(agentButton, async () => {
+      agentSteps.replaceChildren();
+      const data = await askClique(ideas.dataset.agentUrl, {
+        request: agentRequest.value,
+      });
+      if (data) {
+        showSteps(data.steps);
+        fillMessageBox(data.draft);
+      }
+    });
+  }
+
+  agentButton.addEventListener("click", askAgent);
+  agentRequest.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault(); // don't send the chat message
+      askAgent();
+    }
   });
 
   ideas.classList.remove("d-none"); // JavaScript works, so show the buttons

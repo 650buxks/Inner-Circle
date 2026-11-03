@@ -11,6 +11,7 @@ class AIRequest(models.Model):
         REPLY = "reply", "Help me reply"
         MENTION = "mention", "@clique"
         DRAFT = "draft", "Write it for me"
+        AGENT = "agent", "Ask the agent"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

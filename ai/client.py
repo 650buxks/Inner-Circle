@@ -1,7 +1,8 @@
 """The one place Clique talks to Claude, Anthropic's AI model.
 
-Everything else calls ask_claude(), so the model, error handling and
-safety settings live in one file.
+Everything else calls ask_claude() (one question, one answer) or
+call_claude() (the full API, used by the reply agent), so the model, error
+handling and safety settings live in one file.
 """
 
 import logging
@@ -31,6 +32,25 @@ def ask_claude(system, prompt, max_tokens=4000, effort="low"):
     `effort` trades depth of thinking for speed and cost: "low" suits
     short jobs like summaries.
     """
+    response = call_claude(
+        max_tokens=max_tokens,
+        system=system,
+        messages=[{"role": "user", "content": prompt}],
+        output_config={"effort": effort},
+    )
+    texts = [block.text for block in response.content if block.type == "text"]
+    text = "".join(texts).strip()
+    if not text:
+        raise AIError("Clique AI didn't come up with anything. Try again.")
+    return text, response.usage
+
+
+def call_claude(**request):
+    """Send one request to Claude and return the whole response.
+
+    `request` holds the Messages API arguments (system, messages, tools…);
+    this adds the model, the safety fallbacks and the error handling.
+    """
     if not settings.ANTHROPIC_API_KEY:
         raise AIError("Clique AI isn't set up yet.")
 
@@ -38,23 +58,16 @@ def ask_claude(system, prompt, max_tokens=4000, effort="low"):
         api_key=settings.ANTHROPIC_API_KEY,
         timeout=60.0,  # seconds; nobody should wait longer than this
     )
-    options = {}
     if settings.AI_MODEL in FALLBACK_MODELS:
         # If Claude's safety checks decline a request, the API retries it
         # on a suitable fallback model instead of failing.
-        options = {
-            "betas": ["server-side-fallback-2026-07-01"],
-            "fallbacks": "default",
-        }
+        request["betas"] = ["server-side-fallback-2026-07-01"]
+        request["fallbacks"] = "default"
 
     try:
         response = client.beta.messages.create(
             model=settings.AI_MODEL,
-            max_tokens=max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": prompt}],
-            output_config={"effort": effort},
-            **options,
+            **request,
         )
     except anthropic.RateLimitError:
         logger.warning("Claude rate limit reached")
@@ -66,8 +79,4 @@ def ask_claude(system, prompt, max_tokens=4000, effort="low"):
 
     if response.stop_reason == "refusal":
         raise AIError("Clique AI can't help with this one.")
-    texts = [block.text for block in response.content if block.type == "text"]
-    text = "".join(texts).strip()
-    if not text:
-        raise AIError("Clique AI didn't come up with anything. Try again.")
-    return text, response.usage
+    return response
