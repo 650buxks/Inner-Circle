@@ -213,14 +213,6 @@ body {
   max-height: 10rem;
 }
 
-/* "Help me reply" suggestions: tap one to put it in the message box. */
-.reply-idea {
-  border: 1px solid var(--clique-purple);
-  border-radius: 1rem;
-  text-align: left;
-  white-space: normal;
-}
-
 /* --- Avatars and online status ------------------------------------------- */
 
 /* Round "avatar" with the person's first initial, until profile photos arrive. */

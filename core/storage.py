@@ -55,6 +55,20 @@ class CloudinaryStorage(Storage):
             quality="auto",
         )
 
+    def preview_url(self, name):
+        """A small JPEG of a photo, or a still frame from a video, for
+        Clique AI to look at (Claude can't watch videos)."""
+        if _resource_type(name) == "video":
+            asset = cloudinary.CloudinaryVideo(_public_id(name))
+        else:
+            asset = cloudinary.CloudinaryImage(_public_id(name))
+        return asset.build_url(
+            secure=True,
+            format="jpg",
+            width=1024,
+            crop="limit",  # shrink big images, never enlarge small ones
+        )
+
     def delete(self, name):
         cloudinary.uploader.destroy(
             _public_id(name),

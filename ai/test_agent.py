@@ -92,6 +92,7 @@ def test_agent_searches_then_drafts(script, chat, francis, jordan):
     assert [t["name"] for t in first["tools"]] == [
         "search_messages",
         "get_members",
+        "answer_privately",
         "draft_reply",
     ]
     # Round 2 carries Claude's tool call and our search result.
@@ -99,6 +100,22 @@ def test_agent_searches_then_drafts(script, chat, francis, jordan):
     result_block = second["messages"][2]["content"][0]
     assert result_block["tool_use_id"] == "call-search_messages"
     assert "jordan: Trip idea: Tahoe in March?" in result_block["content"]
+
+
+def test_agent_answers_questions_privately(script, chat, francis, jordan):
+    send_message(jordan, chat, "Hit 315 on squat today")
+    script.turns = [
+        turn(tool("search_messages", query="squat")),
+        turn(tool("answer_privately", text="Jordan said 315 on squat.")),
+    ]
+
+    result = run_agent(francis, chat, "how much is he lifting?")
+
+    assert result == {
+        "answer": "Jordan said 315 on squat.",
+        "steps": ["🔎 Searched the chat for “squat”"],
+    }
+    assert chat.messages.count() == 1  # nothing posted in the chat
 
 
 def test_agent_records_tokens_from_every_round(script, chat, francis):
@@ -208,7 +225,7 @@ def test_echoable_keeps_only_text_before_a_fallback():
     assert kept[1] is late_call
 
 
-def test_agent_view_returns_draft_and_steps(client, monkeypatch, chat, francis):
+def test_help_me_reply_view_returns_draft_and_steps(client, monkeypatch, chat, francis):
     client.force_login(francis)
     monkeypatch.setattr(
         "chats.views.run_agent",
@@ -218,7 +235,9 @@ def test_agent_view_returns_draft_and_steps(client, monkeypatch, chat, francis):
         },
     )
 
-    response = client.post(reverse("chats:agent", args=[chat.pk]), {"request": "answer them"})
+    response = client.post(
+        reverse("chats:help_me_reply", args=[chat.pk]), {"request": "answer them"}
+    )
 
     data = response.json()
     assert data["draft"] == "Count me in!"
@@ -229,7 +248,7 @@ def test_agent_view_returns_draft_and_steps(client, monkeypatch, chat, francis):
 def test_agent_view_reports_errors(client, chat, francis):
     client.force_login(francis)
 
-    response = client.post(reverse("chats:agent", args=[chat.pk]), {"request": ""})
+    response = client.post(reverse("chats:help_me_reply", args=[chat.pk]), {"request": ""})
 
     assert response.status_code == 400
     assert "Say what you need" in response.json()["error"]
@@ -239,7 +258,7 @@ def test_outsiders_cannot_use_the_agent(client, chat):
     outsider = User.objects.create_user(username="sam", password="pass")
     client.force_login(outsider)
 
-    response = client.post(reverse("chats:agent", args=[chat.pk]), {"request": "hi"})
+    response = client.post(reverse("chats:help_me_reply", args=[chat.pk]), {"request": "hi"})
 
     assert response.status_code == 404
 
@@ -249,4 +268,4 @@ def test_chat_page_has_agent_button(client, chat, francis):
 
     page = client.get(reverse("chats:detail", args=[chat.pk])).content.decode()
 
-    assert "Ask the agent" in page
+    assert "Help me reply" in page

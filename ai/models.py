@@ -8,10 +8,10 @@ class AIRequest(models.Model):
 
     class Feature(models.TextChoices):
         CATCH_UP = "catch_up", "Catch me up"
-        REPLY = "reply", "Help me reply"
+        REPLY = "reply", "Reply ideas (old)"
         MENTION = "mention", "@clique"
         DRAFT = "draft", "Write it for me"
-        AGENT = "agent", "Ask the agent"
+        AGENT = "agent", "Help me reply"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

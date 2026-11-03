@@ -55,40 +55,31 @@
   <div id="chat-error" class="alert alert-danger d-none"></div>
 
   {% if chat.ai_enabled %}
-    {# Hidden until reply-ideas.js loads, since it needs JavaScript. #}
-    <div id="reply-ideas" class="d-none mt-3"
-         data-url="{% url 'chats:reply_ideas' chat.pk %}"
-         data-draft-url="{% url 'chats:draft' chat.pk %}"
-         data-agent-url="{% url 'chats:agent' chat.pk %}">
+    {# Hidden until ai-tools.js loads, since it needs JavaScript. #}
+    <div id="ai-tools" class="d-none mt-3"
+         data-write-url="{% url 'chats:write_for_me' chat.pk %}"
+         data-help-url="{% url 'chats:help_me_reply' chat.pk %}">
       <div class="d-flex flex-wrap align-items-center gap-2">
         {% if user.smart_replies_on %}
-          <button type="button" id="reply-ideas-button" class="btn btn-outline-primary btn-sm">
-            ✨ Help me reply
+          <button type="button" id="write-button" class="btn btn-outline-primary btn-sm">
+            ✍️ Write it for me
           </button>
         {% endif %}
-        <button type="button" id="write-toggle" class="btn btn-outline-primary btn-sm">
-          ✍️ Write it for me
-        </button>
-        <button type="button" id="agent-toggle" class="btn btn-outline-primary btn-sm">
-          🤖 Ask the agent
+        <button type="button" id="help-toggle" class="btn btn-outline-primary btn-sm">
+          ✨ Help me reply
         </button>
         <span class="small text-body-secondary ms-auto">
           <span id="ai-uses-left">{{ ai_uses_left }}</span> of {{ ai_limit }} AI uses left today
         </span>
       </div>
-      <div id="reply-ideas-list" class="d-flex flex-wrap gap-2 mt-2"></div>
-      <div id="write-box" class="d-none d-flex gap-2 mt-2">
-        <input type="text" id="write-request" class="form-control form-control-sm" maxlength="300"
-               placeholder="What should it say? e.g. say no politely, I'm busy Saturday">
-        <button type="button" id="write-button" class="btn btn-primary btn-sm text-nowrap">Write</button>
-      </div>
-      <div id="agent-box" class="d-none mt-2">
+      <div id="help-box" class="d-none mt-2">
         <div class="d-flex gap-2">
-          <input type="text" id="agent-request" class="form-control form-control-sm" maxlength="300"
-                 placeholder="e.g. help me answer Jordan about the trip">
-          <button type="button" id="agent-button" class="btn btn-primary btn-sm text-nowrap">Ask</button>
+          <input type="text" id="help-request" class="form-control form-control-sm" maxlength="300"
+                 placeholder="e.g. say no politely, or: what time did we agree on?">
+          <button type="button" id="help-button" class="btn btn-primary btn-sm text-nowrap">Ask</button>
         </div>
-        <ul id="agent-steps" class="list-unstyled small text-body-secondary mt-2 mb-0"></ul>
+        <ul id="help-steps" class="list-unstyled small text-body-secondary mt-2 mb-0"></ul>
+        <div id="help-answer" class="card p-2 mt-2 small ai-card d-none"></div>
       </div>
     </div>
   {% endif %}
@@ -109,5 +100,5 @@
 </div>
 
 <script src="{% static 'js/chat.js' %}"></script>
-<script src="{% static 'js/reply-ideas.js' %}"></script>
+<script src="{% static 'js/ai-tools.js' %}"></script>
 {% endblock %}

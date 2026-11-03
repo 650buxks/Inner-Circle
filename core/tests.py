@@ -120,6 +120,21 @@ def test_cloudinary_storage_handles_videos(monkeypatch):
     assert url.endswith("/chats/1/videos/abc.mp4")  # converted for browsers
 
 
+def test_cloudinary_previews_for_clique_ai(monkeypatch):
+    monkeypatch.setattr(cloudinary.config(), "cloud_name", "demo")
+    storage = CloudinaryStorage()
+
+    photo = storage.preview_url("chats/1/abc.png")
+    frame = storage.preview_url("chats/1/videos/abc.mov")
+
+    # A small JPEG of the photo, and a still frame from the video.
+    assert photo.startswith("https://res.cloudinary.com/demo/image/upload/")
+    assert "c_limit,w_1024" in photo
+    assert photo.endswith("/chats/1/abc.jpg")
+    assert "/demo/video/upload/" in frame
+    assert frame.endswith("/chats/1/videos/abc.jpg")
+
+
 @pytest.fixture
 def logged_in(client, db):
     user = get_user_model().objects.create_user(username="francis", password="pass")
