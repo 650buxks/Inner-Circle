@@ -8,6 +8,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
+from ai.agent import run_agent
 from ai.client import AIError
 from ai.services import catch_up as summarize_missed
 from ai.services import suggest_replies, uses_left, write_draft
@@ -298,6 +299,18 @@ def ai_switch(request, pk):
     except ChatError as error:
         messages.error(request, str(error))
     return back_to_settings(chat)
+
+
+@login_required
+@require_POST
+def agent(request, pk):
+    """The reply agent's draft and the steps it took, as JSON."""
+    chat = get_chat_for(request.user, pk)
+    try:
+        result = run_agent(request.user, chat, request.POST.get("request", ""))
+    except AIError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    return JsonResponse({**result, "uses_left": uses_left(request.user)})
 
 
 def back_to_settings(chat):
