@@ -73,6 +73,12 @@
   </nav>
 
   <main class="container py-5">
+    {% if user.is_guest %}
+      <div class="alert alert-info mx-auto small" style="max-width: 36rem;">
+        👋 You're trying Clique as a guest. This demo account is deleted within a day.
+        <a href="{% url 'accounts:signup' %}" class="alert-link">Create a real account</a> to keep your chats.
+      </div>
+    {% endif %}
     {% for message in messages %}
       <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} mx-auto" style="max-width: 36rem;">
         {{ message }}

@@ -41,6 +41,8 @@ class User(AbstractUser):
     last_seen = models.DateTimeField(null=True, blank=True)
     # How many live connections (open chat tabs) this person has right now.
     open_connections = models.PositiveIntegerField(default=0)
+    # Made by "Try the demo"; deleted after a day (see core/demo.py).
+    is_guest = models.BooleanField(default=False)
     ai_opt_out = models.BooleanField(default=False)
     smart_replies_on = models.BooleanField(default=True)
     friend_requests_from = models.CharField(

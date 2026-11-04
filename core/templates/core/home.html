@@ -17,6 +17,10 @@
       <a href="{% url 'accounts:signup' %}" class="btn btn-primary btn-lg px-4">Create account</a>
       <a href="{% url 'accounts:login' %}" class="btn btn-outline-primary btn-lg px-4">Log in</a>
     </div>
+    <form method="post" action="{% url 'core:demo' %}" class="mt-3">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-link px-0">✨ Just looking? Try the demo, no sign-up needed &rarr;</button>
+    </form>
   </div>
 
   <div class="col-lg-6">
@@ -50,7 +54,7 @@
     <div class="card h-100 p-4">
       <div class="feature-icon mb-2">✨</div>
       <h2 class="h5">AI that helps</h2>
-      <p class="text-body-secondary small mb-0">Coming soon: catch up on busy chats and get help replying.</p>
+      <p class="text-body-secondary small mb-0">Catch up on busy chats, get a reply written for you, or ask @clique.</p>
     </div>
   </div>
 </div>

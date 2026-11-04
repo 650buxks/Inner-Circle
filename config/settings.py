@@ -212,5 +212,7 @@ ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 AI_MODEL = env("AI_MODEL", default="claude-opus-5-5")
 # Each person can use Clique AI this many times a day (keeps costs small).
 AI_DAILY_LIMIT = env.int("AI_DAILY_LIMIT", default=30)
+# Demo guests get fewer, since anyone can make a guest account.
+AI_GUEST_DAILY_LIMIT = env.int("AI_GUEST_DAILY_LIMIT", default=10)
 # "Catch me up" appears when you've missed at least this many messages.
 CATCH_UP_MIN_UNREAD = env.int("CATCH_UP_MIN_UNREAD", default=10)

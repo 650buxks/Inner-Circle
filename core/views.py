@@ -1,8 +1,13 @@
 import redis
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import login
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
+
+from .demo import create_guest
 
 
 def photo_storage():
@@ -53,6 +58,21 @@ def home(request):
     if request.user.is_authenticated:
         return redirect("chats:inbox")
     return render(request, "core/home.html")
+
+
+@require_POST
+def demo(request):
+    """ "Try the demo": log in as a brand-new guest with sample chats."""
+    guest = create_guest()
+    # Only one login backend is set up (see settings.py), so Django uses it.
+    login(request, guest)
+    messages.success(
+        request,
+        "Welcome to the Clique demo! 👋 Your friends Jordan, Sam and Maya are "
+        "waiting in your chats. Try ✨ Catch me up, ✍️ Write it for me, "
+        "✨ Help me reply or @clique.",
+    )
+    return redirect("chats:inbox")
 
 
 def health(request):

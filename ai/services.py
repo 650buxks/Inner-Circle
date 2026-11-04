@@ -74,16 +74,23 @@ MENTION_CONTEXT = 50
 MENTION = re.compile(r"(?<![\w@.])@clique\b", re.IGNORECASE)
 
 
+def daily_limit(user):
+    """How many times a day `user` can use Clique AI."""
+    if user.is_guest:
+        return settings.AI_GUEST_DAILY_LIMIT
+    return settings.AI_DAILY_LIMIT
+
+
 def uses_left(user):
     """How many more times `user` can use Clique AI today."""
     today = timezone.localdate()
     used = user.ai_requests.filter(created_at__date=today).count()
-    return max(settings.AI_DAILY_LIMIT - used, 0)
+    return max(daily_limit(user) - used, 0)
 
 
 def check_daily_limit(user):
     if not uses_left(user):
-        limit = settings.AI_DAILY_LIMIT
+        limit = daily_limit(user)
         error = f"You've used Clique AI {limit} times today."
         raise AIError(f"{error} It resets tomorrow.")
 

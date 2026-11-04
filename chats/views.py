@@ -11,7 +11,7 @@ from accounts.models import User
 from ai.agent import run_agent
 from ai.client import AIError
 from ai.services import catch_up as summarize_missed
-from ai.services import uses_left, write_reply
+from ai.services import daily_limit, uses_left, write_reply
 
 from .forms import AddMembersForm, GroupForm
 from .models import Conversation, Message
@@ -123,7 +123,7 @@ def chat_detail(request, pk):
         "offer_catch_up": chat.ai_enabled and enough,
         "last_read": last_read.isoformat() if last_read else "",
         "ai_uses_left": uses_left(request.user),
-        "ai_limit": settings.AI_DAILY_LIMIT,
+        "ai_limit": daily_limit(request.user),
     }
     return render(request, "chats/detail.html", context)
 
