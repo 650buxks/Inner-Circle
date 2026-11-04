@@ -49,6 +49,12 @@ def test_photo_storage_spots_bad_keys(settings, value, expected):
     assert photo_storage() == expected
 
 
+def test_health_reports_email(client):
+    response = client.get(reverse("core:health"))
+
+    assert response.json()["email"] == "console"  # no email service in tests
+
+
 @pytest.mark.parametrize("key, expected", [("", "not set up"), ("sk-ant-test", "ready")])
 def test_health_reports_ai(client, settings, key, expected):
     settings.ANTHROPIC_API_KEY = key
