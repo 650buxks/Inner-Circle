@@ -93,6 +93,7 @@ def test_agent_searches_then_drafts(script, chat, francis, jordan):
         "search_messages",
         "get_members",
         "answer_privately",
+        "create_poll",
         "draft_reply",
     ]
     # Round 2 carries Claude's tool call and our search result.
@@ -116,6 +117,31 @@ def test_agent_answers_questions_privately(script, chat, francis, jordan):
         "steps": ["🔎 Searched the chat for “squat”"],
     }
     assert chat.messages.count() == 1  # nothing posted in the chat
+
+
+def test_agent_proposes_a_poll_without_posting_it(script, chat, francis):
+    script.turns = [
+        turn(tool("create_poll", question="Which day?", options=["Fri", "Sat", "Sat"])),
+    ]
+
+    result = run_agent(francis, chat, "make a poll for the trip day")
+
+    assert result == {"poll": {"question": "Which day?", "options": ["Fri", "Sat"]}, "steps": []}
+    assert not chat.messages.exists()  # only posted once the person confirms
+
+
+def test_agent_hears_what_was_wrong_with_a_poll(script, chat, francis):
+    script.turns = [
+        turn(tool("create_poll", question="Which day?", options=["Fri"])),
+        turn(tool("create_poll", question="Which day?", options=["Fri", "Sat"])),
+    ]
+
+    result = run_agent(francis, chat, "make a poll")
+
+    assert result["poll"]["options"] == ["Fri", "Sat"]
+    error = script.requests[1]["messages"][2]["content"][0]
+    assert error["is_error"] is True
+    assert "2 to 6 different options" in error["content"]
 
 
 def test_agent_records_tokens_from_every_round(script, chat, francis):

@@ -21,6 +21,7 @@ from .services import (
     chat_partner,
     chat_title,
     create_group,
+    create_poll,
     delete_message,
     edit_message,
     get_or_create_private_chat,
@@ -39,6 +40,7 @@ from .services import (
     shared_media,
     split_attachment,
     unread_count,
+    vote,
 )
 
 # How many messages the chat page shows at a time.
@@ -69,6 +71,11 @@ def get_group_for(user, pk):
     if chat.kind != Conversation.Kind.GROUP:
         raise Http404
     return chat
+
+
+def is_ajax(request):
+    """Whether the page's JavaScript sent this (it wants JSON back)."""
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
 
 def back_to_chat(chat):
@@ -222,6 +229,44 @@ def delete(request, pk):
         delete_message(request.user, message)
     except ChatError as error:
         messages.error(request, str(error))
+    return back_to_chat(message.conversation)
+
+
+# --- Polls ----------------------------------------------------------------
+
+
+@login_required
+@require_POST
+def post_poll(request, pk):
+    """Post a poll, after the person confirmed the one Clique AI proposed."""
+    chat = get_chat_for(request.user, pk)
+    try:
+        create_poll(
+            request.user,
+            chat,
+            request.POST.get("question", ""),
+            request.POST.getlist("options"),
+        )
+    except ChatError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def vote_in_poll(request, pk):
+    message = get_message_for(request.user, pk)
+    if message.kind != Message.Kind.POLL:
+        raise Http404
+    try:
+        vote(request.user, message.poll, request.POST.get("option"))
+    except ChatError as error:
+        if is_ajax(request):
+            return JsonResponse({"error": str(error)}, status=400)
+        messages.error(request, str(error))
+    if is_ajax(request):
+        # Everyone's page, including this one, redraws the poll live.
+        return JsonResponse({"ok": True})
     return back_to_chat(message.conversation)
 
 

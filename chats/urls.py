@@ -15,6 +15,8 @@ urlpatterns = [
     path("start/<str:username>/", views.start_chat, name="start"),
     path("messages/<int:pk>/edit/", views.edit, name="edit"),
     path("messages/<int:pk>/delete/", views.delete, name="delete"),
+    path("messages/<int:pk>/vote/", views.vote_in_poll, name="vote"),
+    path("<int:pk>/polls/", views.post_poll, name="post_poll"),
     # Group chats
     path("groups/new/", views.new_group, name="new_group"),
     path("<int:pk>/settings/", views.group_settings, name="group_settings"),

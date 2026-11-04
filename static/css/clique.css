@@ -314,3 +314,28 @@ img.avatar {
     animation: none;
   }
 }
+
+/* --- Polls ---------------------------------------------------------------- */
+
+.poll-card {
+  min-width: min(20rem, 100%);
+  border-left: 4px solid var(--clique-purple);
+}
+
+/* Each option fills with purple to show its share of the votes. */
+.poll-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid var(--bs-border-color);
+  background: linear-gradient(
+    to right,
+    rgba(124, 58, 237, 0.18) var(--poll-share),
+    transparent var(--poll-share)
+  );
+}
+
+.poll-option.poll-mine {
+  border-color: var(--clique-purple);
+  font-weight: 600;
+}

@@ -58,7 +58,8 @@
     {# Hidden until ai-tools.js loads, since it needs JavaScript. #}
     <div id="ai-tools" class="d-none mt-3"
          data-write-url="{% url 'chats:write_for_me' chat.pk %}"
-         data-help-url="{% url 'chats:help_me_reply' chat.pk %}">
+         data-help-url="{% url 'chats:help_me_reply' chat.pk %}"
+         data-poll-url="{% url 'chats:post_poll' chat.pk %}">
       <div class="d-flex flex-wrap align-items-center gap-2">
         {% if user.smart_replies_on %}
           <button type="button" id="write-button" class="btn btn-outline-primary btn-sm">
@@ -75,11 +76,20 @@
       <div id="help-box" class="d-none mt-2">
         <div class="d-flex gap-2">
           <input type="text" id="help-request" class="form-control form-control-sm" maxlength="300"
-                 placeholder="e.g. say no politely, or: what time did we agree on?">
+                 placeholder="e.g. say no politely, what time did we agree on?, make a poll">
           <button type="button" id="help-button" class="btn btn-primary btn-sm text-nowrap">Ask</button>
         </div>
         <ul id="help-steps" class="list-unstyled small text-body-secondary mt-2 mb-0"></ul>
         <div id="help-answer" class="card p-2 mt-2 small ai-card d-none"></div>
+        <div id="poll-preview" class="card p-3 mt-2 poll-card d-none">
+          <div class="small text-body-secondary mb-1">Clique AI suggests this poll. Post it?</div>
+          <div id="poll-preview-question" class="fw-semibold mb-2"></div>
+          <ul id="poll-preview-options" class="mb-2"></ul>
+          <div class="d-flex gap-2">
+            <button type="button" id="poll-post" class="btn btn-primary btn-sm">📊 Post poll</button>
+            <button type="button" id="poll-cancel" class="btn btn-outline-secondary btn-sm">Cancel</button>
+          </div>
+        </div>
       </div>
     </div>
   {% endif %}
