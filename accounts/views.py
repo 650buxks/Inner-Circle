@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -14,7 +13,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 
-from ai.services import uses_left
+from ai.services import daily_limit, uses_left
 from friends.services import (
     accepts_requests_from,
     mutual_friends,
@@ -120,7 +119,7 @@ def settings_page(request, **forms):
         "delete_form": DeleteAccountForm(user=user),
         "blocked_users": user.blocked_users.order_by("username"),
         "ai_uses_left": uses_left(user),
-        "ai_limit": settings.AI_DAILY_LIMIT,
+        "ai_limit": daily_limit(user),
     }
     context.update(forms)
     return render(request, "accounts/settings.html", context)
@@ -131,8 +130,25 @@ def account_settings(request):
     return settings_page(request)
 
 
+def not_for_guests(view):
+    """Demo guests can't change their email or password: their account is
+    deleted within a day anyway."""
+
+    def wrapper(request, *args, **kwargs):
+        if request.user.is_guest:
+            messages.error(
+                request,
+                "Demo accounts can't change this. Create a real account instead.",
+            )
+            return redirect("accounts:settings")
+        return view(request, *args, **kwargs)
+
+    return wrapper
+
+
 @login_required
 @require_POST
+@not_for_guests
 def change_email(request):
     form = ChangeEmailForm(request.POST, user=request.user)
     if form.is_valid():
@@ -145,6 +161,7 @@ def change_email(request):
 
 @login_required
 @require_POST
+@not_for_guests
 def change_password(request):
     form = ChangePasswordForm(request.user, request.POST)
     if form.is_valid():

@@ -8,6 +8,7 @@ from django.contrib.auth.forms import (
 )
 from django.core.files.uploadedfile import UploadedFile
 
+from core.demo import is_reserved
 from core.uploads import BadUpload, check_photo
 
 from .models import User
@@ -25,6 +26,12 @@ class SignUpForm(UserCreationForm):
         # Give every input Bootstrap's styling.
         for field in self.fields.values():
             field.widget.attrs["class"] = "form-control"
+
+    def clean_username(self):
+        username = super().clean_username()
+        if is_reserved(username):
+            raise forms.ValidationError("That username is reserved. Pick another.")
+        return username
 
     def clean_email(self):
         """Don't allow two accounts with the same email."""

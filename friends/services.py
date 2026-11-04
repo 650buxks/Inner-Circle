@@ -68,6 +68,9 @@ def send_friend_request(from_user, to_user):
     """
     if from_user == to_user:
         raise FriendshipError("You can't add yourself as a friend.")
+    if from_user.is_guest or to_user.is_guest:
+        # Demo guests only chat with the demo friends, never real people.
+        raise FriendshipError("Demo accounts can't add friends.")
     if is_blocked_between(from_user, to_user):
         raise FriendshipError("You can't send a request to this person.")
     if are_friends(from_user, to_user):

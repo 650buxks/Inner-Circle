@@ -52,6 +52,9 @@ def find_people(request):
         results = list(
             User.objects.filter(by_username | by_name, is_active=True)
             .exclude(pk=me.pk)
+            # Demo guests and demo friends stay out of search.
+            .exclude(is_guest=True)
+            .exclude(username__startswith="demo-")
             # Hide people you've blocked and people who've blocked you.
             .exclude(pk__in=me.blocked_users.all())
             .exclude(pk__in=me.blocked_by.all())
