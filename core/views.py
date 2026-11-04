@@ -50,6 +50,7 @@ def check_services():
         results["redis"] = "not configured"
     results["photos"] = photo_storage()
     results["ai"] = "ready" if settings.ANTHROPIC_API_KEY else "not set up"
+    results["email"] = settings.EMAIL_SERVICE
     return results
 
 

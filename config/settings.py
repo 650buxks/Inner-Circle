@@ -152,16 +152,32 @@ LOGGING = {
 
 # --- Email ------------------------------------------------------------------
 
-# While developing, emails are printed in the terminal (`docker compose logs
-# web`) instead of being sent. Production sets a real email service here.
-MAILERS = {
-    "default": {
-        "BACKEND": env(
-            "EMAIL_BACKEND",
-            default="django.core.mail.backends.console.EmailBackend",
-        ),
-    },
-}
+# Production sends real email through an SMTP service (like Brevo) when
+# EMAIL_HOST is set. Without it, emails are printed in the terminal
+# (`docker compose logs web`) instead of being sent.
+# (Django 6.1 reads email settings from MAILERS only, so the host is kept in
+# a lowercase variable here: lowercase names aren't Django settings.)
+smtp_host = env("EMAIL_HOST", default="")
+# Shown on /health/: "smtp" sends real emails, "console" only prints them.
+EMAIL_SERVICE = "smtp" if smtp_host else "console"
+if smtp_host:
+    MAILERS = {
+        "default": {
+            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+            "OPTIONS": {
+                "host": smtp_host,
+                "port": env.int("EMAIL_PORT", default=587),
+                "username": env("EMAIL_HOST_USER", default=""),
+                "password": env("EMAIL_HOST_PASSWORD", default=""),
+                "use_tls": True,  # encrypt the connection
+                "timeout": 10,  # seconds, so a slow service can't hang a page
+            },
+        },
+    }
+else:
+    MAILERS = {
+        "default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"},
+    }
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Clique <no-reply@clique.local>")
 
 # --- Language and time ------------------------------------------------------

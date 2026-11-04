@@ -27,6 +27,15 @@ services:
         sync: false # asked for during setup: paste Cloudinary's API URL
       - key: ANTHROPIC_API_KEY
         sync: false # asked for during setup: paste your Claude API key
+      # Real emails (password reset) through Brevo's SMTP service.
+      - key: EMAIL_HOST
+        value: smtp-relay.brevo.com
+      - key: EMAIL_HOST_USER
+        sync: false # Brevo's SMTP login
+      - key: EMAIL_HOST_PASSWORD
+        sync: false # Brevo's SMTP key
+      - key: DEFAULT_FROM_EMAIL
+        sync: false # e.g. Clique <you@example.com>, a sender Brevo verified
   - type: keyvalue # Render's Redis-compatible store, for live messaging
     name: clique-redis
     plan: free
