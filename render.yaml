@@ -30,6 +30,8 @@ services:
       # Real emails (password reset) through Brevo's SMTP service.
       - key: EMAIL_HOST
         value: smtp-relay.brevo.com
+      - key: EMAIL_PORT
+        value: "2525" # Render's free plan blocks the usual email ports (25, 465, 587)
       - key: EMAIL_HOST_USER
         sync: false # Brevo's SMTP login
       - key: EMAIL_HOST_PASSWORD
