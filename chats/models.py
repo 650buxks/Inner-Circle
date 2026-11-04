@@ -112,6 +112,7 @@ class Message(models.Model):
         TEXT = "text", "Text"
         SYSTEM = "system", "System"  # e.g. "Sam added Jordan"
         AI = "ai", "Clique AI"
+        POLL = "poll", "Poll"  # the question is the body; see Poll
 
     MAX_LENGTH = 4000
     MAX_PHOTO_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -157,3 +158,53 @@ class Message(models.Model):
         if self.sender is None:
             return "Deleted user"
         return self.sender.name
+
+
+class Poll(models.Model):
+    """A question friends vote on. It lives in the chat as a message (of
+    kind "poll", with the question as its body)."""
+
+    MAX_QUESTION = 200
+    MAX_OPTION = 80
+    MIN_OPTIONS = 2
+    MAX_OPTIONS = 6
+
+    message = models.OneToOneField(
+        Message,
+        on_delete=models.CASCADE,
+        related_name="poll",
+    )
+
+    def __str__(self):
+        return self.message.body
+
+
+class PollOption(models.Model):
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name="options")
+    text = models.CharField(max_length=Poll.MAX_OPTION)
+    position = models.PositiveSmallIntegerField()  # 0 for the first option
+
+    class Meta:
+        ordering = ["position"]
+
+    def __str__(self):
+        return self.text
+
+
+class PollVote(models.Model):
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name="votes")
+    option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name="votes")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="poll_votes",
+    )
+
+    class Meta:
+        constraints = [
+            # One vote per person per poll (they can change it).
+            models.UniqueConstraint(fields=["poll", "user"], name="one_vote_per_poll"),
+        ]
+
+    def __str__(self):
+        return f"{self.user} voted {self.option}"

@@ -21,14 +21,18 @@
           <video src="{{ message.video.url }}" class="chat-photo" controls playsinline preload="metadata"></video>
         </div>
       {% endif %}
-      {% if message.body %}
+      {% if message.kind == "poll" %}
+        {% include "chats/_poll.html" %}
+      {% elif message.body %}
         <div class="d-inline-block px-3 py-2 rounded-3 text-start {% if message.kind == "ai" %}ai-bubble{% elif message.sender == user %}text-bg-primary{% else %}bg-body-secondary{% endif %}">{{ message.body|linebreaksbr }}</div>
       {% endif %}
-      {% if message.sender == user and message.kind == "text" %}
+      {% if message.sender == user and message.kind == "text" or message.sender == user and message.kind == "poll" %}
         <div class="small">
-          <a href="{% url 'chats:edit' message.pk %}" class="link-secondary">Edit</a>
+          {% if message.kind == "text" %}
+            <a href="{% url 'chats:edit' message.pk %}" class="link-secondary">Edit</a>
+          {% endif %}
           <form method="post" action="{% url 'chats:delete' message.pk %}" class="d-inline"
-                onsubmit="return confirm('Delete this message?');">
+                onsubmit="return confirm('Delete this {% if message.kind == "poll" %}poll{% else %}message{% endif %}?');">
             {# Filled in by chat.js when this arrives over the WebSocket. #}
             <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
             <button type="submit" class="btn btn-link btn-sm link-danger p-0 align-baseline">Delete</button>

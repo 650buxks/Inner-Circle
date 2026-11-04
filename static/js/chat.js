@@ -170,6 +170,28 @@ if (socketUrl) {
     showError("");
   });
 
+  // Voting in a poll: send the vote in the background instead of reloading
+  // the page. The poll then redraws itself (for everyone) over the
+  // WebSocket.
+  messages.addEventListener("submit", async (event) => {
+    const voteForm = event.target.closest(".poll-vote");
+    if (!voteForm || socket?.readyState !== WebSocket.OPEN) {
+      return; // not a vote, or not connected: post the form normally
+    }
+    event.preventDefault();
+    try {
+      const response = await fetch(voteForm.action, {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: new FormData(voteForm), // the option and the CSRF token
+      });
+      const data = await response.json();
+      showError(response.ok ? "" : data.error || "Couldn't save your vote.");
+    } catch {
+      showError("Couldn't save your vote. Check your connection.");
+    }
+  });
+
   // Tell others we're typing, but at most once every 2 seconds.
   textarea.addEventListener("input", () => {
     const now = Date.now();

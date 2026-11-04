@@ -4,6 +4,7 @@ records the request for daily limits."""
 import re
 
 from django.conf import settings
+from django.db.models import Count
 from django.utils import timezone
 
 from chats.models import Message
@@ -96,6 +97,10 @@ def describe(message):
     when = timezone.localtime(message.created_at).strftime("%b %d %H:%M")
     if message.kind == message.Kind.SYSTEM:
         return f"[{when}] (note) {message.body}"
+    if message.kind == message.Kind.POLL and not message.is_deleted:
+        options = message.poll.options.annotate(count=Count("votes"))
+        counts = ", ".join(f"{option.text} ({option.count})" for option in options)
+        return f"[{when}] {message.sender_name}: [poll] {message.body} Votes: {counts}"
     parts = []
     if message.photo:
         parts.append("[sent a photo]")

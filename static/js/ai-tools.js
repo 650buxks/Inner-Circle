@@ -2,7 +2,8 @@
 // - "Write it for me": one tap writes a reply from the latest messages
 //   and photos. Tap again for a different one.
 // - "Help me reply": type what you need. Requests ("say no politely") get
-//   a draft; questions ("what time did we agree on?") get a private answer.
+//   a draft; questions ("what time did we agree on?") get a private answer;
+//   "make a poll for Saturday" gets a poll to look over before posting.
 // Nothing is ever sent for you: you can edit the text, then press Send.
 
 const tools = document.getElementById("ai-tools");
@@ -16,6 +17,12 @@ if (tools) {
   const helpSteps = document.getElementById("help-steps");
   const helpAnswer = document.getElementById("help-answer");
   const usesLeft = document.getElementById("ai-uses-left");
+  const pollPreview = document.getElementById("poll-preview");
+  const pollQuestion = document.getElementById("poll-preview-question");
+  const pollOptions = document.getElementById("poll-preview-options");
+  const pollPost = document.getElementById("poll-post");
+  const pollCancel = document.getElementById("poll-cancel");
+  let proposedPoll = null; // the poll waiting for "Post poll"
   const textarea = document.querySelector("#send textarea");
   const csrfToken = document.querySelector("#send [name=csrfmiddlewaretoken]").value;
   const errorBox = document.getElementById("chat-error");
@@ -126,10 +133,58 @@ if (tools) {
     }
   }
 
+  // Show the poll Clique AI proposed. Nothing is posted until "Post poll".
+  function showPoll(poll) {
+    proposedPoll = poll;
+    pollPreview.classList.toggle("d-none", !poll);
+    if (!poll) {
+      return;
+    }
+    pollQuestion.textContent = `📊 ${poll.question}`;
+    pollOptions.replaceChildren();
+    for (const option of poll.options) {
+      const item = document.createElement("li");
+      item.textContent = option;
+      pollOptions.append(item);
+    }
+    textarea.form.scrollIntoView({ block: "end" });
+  }
+
+  pollCancel.addEventListener("click", () => showPoll(null));
+
+  pollPost.addEventListener("click", async () => {
+    const fields = new URLSearchParams({ question: proposedPoll.question });
+    for (const option of proposedPoll.options) {
+      fields.append("options", option);
+    }
+    showError("");
+    try {
+      const response = await fetch(tools.dataset.pollUrl, {
+        method: "POST",
+        headers: { "X-CSRFToken": csrfToken },
+        body: fields,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showError(data.error || "Couldn't post the poll.");
+        return;
+      }
+      showPoll(null);
+      showSteps([]);
+      if (!textarea.form.dataset.socketUrl) {
+        location.reload(); // no live updates on this page, so reload
+      }
+      // Otherwise the poll arrives over the WebSocket like any message.
+    } catch {
+      showError("Couldn't post the poll. Check your connection.");
+    }
+  });
+
   function askForHelp() {
     return whileThinking(helpButton, async () => {
       showSteps([]);
       showAnswer("");
+      showPoll(null);
       const data = await askClique(tools.dataset.helpUrl, {
         request: helpRequest.value,
       });
@@ -137,7 +192,9 @@ if (tools) {
         return;
       }
       showSteps(data.steps);
-      if (data.answer) {
+      if (data.poll) {
+        showPoll(data.poll); // posted only if they tap "Post poll"
+      } else if (data.answer) {
         showAnswer(data.answer); // only this person sees it
       } else {
         fillMessageBox(data.draft);

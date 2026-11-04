@@ -7,7 +7,7 @@ one place.
 import logging
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from ai.services import mentions_clique
@@ -15,7 +15,7 @@ from core import uploads
 from core.background import run_in_background
 from friends.services import are_friends, is_blocked_between
 
-from .models import Conversation, Membership, Message
+from .models import Conversation, Membership, Message, Poll, PollOption, PollVote
 from .realtime import broadcast, broadcast_read, update_inboxes
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,9 @@ def preview(message, user):
         return message.body
     if message.kind == Message.Kind.AI:
         return f"✨ Clique AI: {message.body}"
+    if message.kind == Message.Kind.POLL:
+        text = f"📊 {message.body}"
+        return f"You: {text}" if message.sender == user else text
     text = message.body
     if message.photo:
         text = f"📷 {text}" if text else "📷 Photo"
@@ -315,12 +318,7 @@ def send_message(user, conversation, body, photo=None, video=None):
     if len(body) > Message.MAX_LENGTH:
         limit = Message.MAX_LENGTH
         raise ChatError(f"Messages can be at most {limit} characters.")
-    if not is_member(user, conversation):
-        raise ChatError("You're not in this chat.")
-    if conversation.kind == Conversation.Kind.PRIVATE:
-        person = other_person(conversation, user)
-        if person is None or is_blocked_between(user, person):
-            raise ChatError("You can't message this person.")
+    check_can_send(user, conversation)
     if photo:
         check_photo(photo)
     if video:
@@ -352,6 +350,108 @@ def send_message(user, conversation, body, photo=None, video=None):
         # After saving, so the question shows up before the answer.
         transaction.on_commit(lambda: run_in_background(answer_mention, message.pk))
     return message
+
+
+def check_can_send(user, conversation):
+    if not is_member(user, conversation):
+        raise ChatError("You're not in this chat.")
+    if conversation.kind == Conversation.Kind.PRIVATE:
+        person = other_person(conversation, user)
+        if person is None or is_blocked_between(user, person):
+            raise ChatError("You can't message this person.")
+
+
+# --- Polls ----------------------------------------------------------------
+
+
+def clean_poll(question, options):
+    """Tidy up a poll's question and options, or explain what's wrong.
+    Returns (question, options)."""
+    question = str(question).strip()
+    options = [str(option).strip() for option in options]
+    # Drop blanks and repeats ("Friday" and "friday" count as the same).
+    unique = {}
+    for option in options:
+        if option and option.casefold() not in unique:
+            unique[option.casefold()] = option
+    options = list(unique.values())
+    if not question:
+        raise ChatError("A poll needs a question.")
+    if len(question) > Poll.MAX_QUESTION:
+        raise ChatError(f"Keep the question under {Poll.MAX_QUESTION} characters.")
+    if not Poll.MIN_OPTIONS <= len(options) <= Poll.MAX_OPTIONS:
+        low, high = Poll.MIN_OPTIONS, Poll.MAX_OPTIONS
+        raise ChatError(f"A poll needs {low} to {high} different options.")
+    if any(len(option) > Poll.MAX_OPTION for option in options):
+        raise ChatError(f"Keep each option under {Poll.MAX_OPTION} characters.")
+    return question, options
+
+
+@transaction.atomic
+def create_poll(user, conversation, question, options):
+    """Post a poll in the chat, from `user`."""
+    question, options = clean_poll(question, options)
+    check_can_send(user, conversation)
+    # The live update waits until the transaction commits, so the poll and
+    # its options exist by the time anyone draws it.
+    message = _save_message(
+        conversation,
+        sender=user,
+        body=question,
+        kind=Message.Kind.POLL,
+    )
+    poll = Poll.objects.create(message=message)
+    PollOption.objects.bulk_create(
+        PollOption(poll=poll, text=text, position=position) for position, text in enumerate(options)
+    )
+    mark_read(user, conversation)
+    return poll
+
+
+@transaction.atomic
+def vote(user, poll, option_id):
+    """Vote for an option, move your vote, or (tapping your own choice
+    again) take it back."""
+    message = poll.message
+    if not is_member(user, message.conversation):
+        raise ChatError("You're not in this chat.")
+    if message.is_deleted:
+        raise ChatError("This poll was deleted.")
+    option_id = str(option_id)
+    option = poll.options.filter(pk=option_id).first() if option_id.isdigit() else None
+    if option is None:
+        raise ChatError("That option isn't in this poll.")
+    current = poll.votes.filter(user=user).first()
+    if current and current.option_id == option.pk:
+        current.delete()
+    else:
+        PollVote.objects.update_or_create(
+            poll=poll,
+            user=user,
+            defaults={"option": option},
+        )
+    broadcast(message, "message.changed")
+
+
+def poll_results(poll, user):
+    """Each option with its vote count and share, and whether `user` picked
+    it, for showing the poll."""
+    options = list(poll.options.annotate(count=Count("votes")))
+    total = sum(option.count for option in options)
+    mine = poll.votes.filter(user=user).values_list("option_id", flat=True).first()
+    return {
+        "total": total,
+        "options": [
+            {
+                "id": option.pk,
+                "text": option.text,
+                "votes": option.count,
+                "percent": round(100 * option.count / total) if total else 0,
+                "mine": option.pk == mine,
+            }
+            for option in options
+        ],
+    }
 
 
 def post_ai_message(conversation, body):
@@ -403,7 +503,8 @@ def edit_message(user, message, new_body):
 
 def delete_message(user, message):
     """Replace the message with "Message deleted" (it keeps its place)."""
-    if message.sender != user or message.kind != Message.Kind.TEXT:
+    deletable = (Message.Kind.TEXT, Message.Kind.POLL)
+    if message.sender != user or message.kind not in deletable:
         raise ChatError("You can only delete your own messages.")
     if message.photo:
         # Remove the photo file too, not just the link to it.

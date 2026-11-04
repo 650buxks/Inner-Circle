@@ -1,0 +1,22 @@
+{# A poll in the chat. Tapping an option votes; tapping your own choice again takes the vote back. #}
+{% load polls %}
+{% poll_results message.poll user as results %}
+<div class="card poll-card p-3 text-start d-inline-block">
+  <div class="fw-semibold mb-2">📊 {{ message.body }}</div>
+  {% for option in results.options %}
+    <form method="post" action="{% url 'chats:vote' message.pk %}" class="poll-vote mb-2">
+      {# Filled in by chat.js when this arrives over the WebSocket. #}
+      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+      <input type="hidden" name="option" value="{{ option.id }}">
+      <button type="submit" class="poll-option btn btn-sm w-100 text-start{% if option.mine %} poll-mine{% endif %}"
+              style="--poll-share: {{ option.percent }}%"
+              {% if option.mine %}aria-pressed="true"{% endif %}>
+        <span class="poll-option-text">{% if option.mine %}✓ {% endif %}{{ option.text }}</span>
+        <span class="poll-option-count">{{ option.votes }}</span>
+      </button>
+    </form>
+  {% endfor %}
+  <div class="small text-body-secondary">
+    {{ results.total }} vote{{ results.total|pluralize }} · tap to vote
+  </div>
+</div>
