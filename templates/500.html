@@ -1,0 +1,7 @@
+{% extends "_error.html" %}
+{# Shown when the server hits a bug. Django draws it without the usual page data (no logged-in user), so it only uses what's always available. #}
+
+{% block title %}Something went wrong · Clique{% endblock %}
+{% block emoji %}😵‍💫{% endblock %}
+{% block heading %}Something went wrong on our side{% endblock %}
+{% block message %}It's not you, it's us. The error was logged so it can be fixed. Try again in a minute.{% endblock %}
