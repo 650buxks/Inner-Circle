@@ -6,6 +6,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles import finders
 from django.core.files.base import ContentFile
+from django.template.loader import render_to_string
+from django.test import Client
 from django.urls import reverse
 
 from core.background import run_in_background
@@ -207,3 +209,39 @@ def test_background_jobs_use_a_thread_without_a_worker(settings, monkeypatch):
 def test_static_files_exist(path):
     # Pages load these files; a missing one silently breaks the page.
     assert finders.find(path), f"static/{path} is missing"
+
+
+# --- Error pages and link previews ----------------------------------------
+
+
+@pytest.mark.django_db
+def test_friendly_404_page(client):
+    response = client.get("/this-page-does-not-exist/")
+
+    assert response.status_code == 404
+    assert "This page wandered off" in response.content.decode()
+
+
+def test_500_page_works_without_page_data():
+    # Django draws 500.html with no request or user, after something broke.
+    html = render_to_string("500.html")
+
+    assert "Something went wrong on our side" in html
+
+
+@pytest.mark.django_db
+def test_expired_form_page():
+    client = Client(enforce_csrf_checks=True)  # like a real browser
+
+    response = client.post(reverse("accounts:login"), {"username": "x"})
+
+    assert response.status_code == 403
+    assert "This page expired" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_link_preview_tags(client):
+    page = client.get(reverse("core:home")).content.decode()
+
+    assert '<meta property="og:title" content="Clique' in page
+    assert 'content="http://testserver/static/img/og-image.jpg"' in page

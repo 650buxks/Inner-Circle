@@ -4,7 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Clique{% endblock %}</title>
-  <meta name="description" content="Clique: a private messaging app for close friends.">
+  <meta name="description" content="Clique: a private messaging app for close friends, with live group chats, polls and a Claude-powered AI assistant.">
+  {# Link previews (iMessage, Slack, LinkedIn...) show this title, text and picture. #}
+  <meta property="og:title" content="Clique · Your people, your chats">
+  <meta property="og:description" content="A private messaging app for close friends, with live group chats, polls and an AI assistant. Try the demo, no sign-up needed.">
+  <meta property="og:type" content="website">
+  {% if request %}
+    <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}/">
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/og-image.jpg' %}">
+  {% endif %}
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#7c3aed">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%237c3aed'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white' font-family='cursive'>C</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">

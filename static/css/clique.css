@@ -339,3 +339,10 @@ img.avatar {
   border-color: var(--clique-purple);
   font-weight: 600;
 }
+
+/* --- Error pages (404, 403, 500) ----------------------------------------- */
+
+.error-emoji {
+  font-size: 4rem;
+  line-height: 1;
+}
